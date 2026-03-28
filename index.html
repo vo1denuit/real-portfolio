@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ㅤ</title>
+  <title>비행님</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪽</text></svg>">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -30,6 +30,7 @@
       <div id="pReg" style="display:none">
         <div class="modal-title">회원가입</div>
         <div class="modal-row"><label>아이디</label><input type="text" id="reId" placeholder="영문+숫자 4자 이상"></div>
+        <div class="modal-row"><label>이름 (닉네임)</label><input type="text" id="reNick" placeholder="사이트에서 보일 이름"></div>
         <div class="modal-row"><label>이메일</label><input type="email" id="reEmail" placeholder="example@email.com"></div>
         <div class="modal-row"><label>비밀번호</label><input type="password" id="rePw" placeholder="6자 이상"></div>
         <div class="modal-row"><label>비밀번호 확인</label><input type="password" id="rePw2"></div>
@@ -42,8 +43,9 @@
       <div id="pMyInfo" style="display:none">
         <div class="modal-title">내 정보</div>
         <div class="modal-row"><label>아이디</label><input type="text" id="myId" disabled></div>
+        <div class="modal-row"><label>이름 (닉네임)</label><input type="text" id="myNick" placeholder="사이트에서 보일 이름"></div>
         <div class="modal-row"><label>현재 비밀번호</label><input type="password" id="myOldPw"></div>
-        <div class="modal-row"><label>새 비밀번호</label><input type="password" id="myNewPw" placeholder="6자 이상"></div>
+        <div class="modal-row"><label>새 비밀번호</label><input type="password" id="myNewPw" placeholder="6자 이상 (변경 시에만 입력)"></div>
         <div class="modal-row"><label>새 비밀번호 확인</label><input type="password" id="myNewPw2"></div>
         <div class="modal-err" id="myErr"></div>
         <button class="modal-btn" id="btnSaveMyInfo">저장</button>
@@ -54,6 +56,7 @@
       <div id="pUserDetail" style="display:none">
         <div class="modal-title">회원 정보</div>
         <div class="modal-row"><label>아이디</label><input type="text" id="udId" disabled></div>
+        <div class="modal-row"><label>이름 (닉네임)</label><input type="text" id="udNick" placeholder="변경할 이름"></div>
         <div class="modal-row"><label>이메일</label><input type="text" id="udEmail" disabled></div>
         <div class="modal-row"><label>가입일</label><input type="text" id="udDate" disabled></div>
         <div class="modal-row"><label>권한</label><input type="text" id="udRole" disabled></div>
@@ -227,7 +230,7 @@
                 <span>비밀번호</span><input type="password" id="gbPw">
               </div>
             </div>
-            <textarea class="gf-textarea" id="gbText" placeholder="방명록 남기기🔍"></textarea>
+            <textarea class="gf-textarea" id="gbText" placeholder="방명록을 남겨주세요 :)"></textarea>
             <div class="gf-submit-row"><button onclick="submitGuest()">남기기</button></div>
           </div>
           <div class="guestbook-list" id="guestList"></div>
@@ -239,9 +242,10 @@
             <span id="adminTabTitle">관리자 — 회원 목록</span>
             <div style="display:flex;gap:16px;align-items:center">
               <span class="admin-count" id="adminUserCount"></span>
-              <span style="font-size:12px;color:#aaa;cursor:pointer" onclick="showAdminTab('users')" id="tabUsers">회원</span>
+              <span style="font-size:12px;color:#aaa;cursor:pointer" onclick="showAdminTab('users')"  id="tabUsers">회원</span>
               <span style="font-size:12px;color:#aaa;cursor:pointer" onclick="showAdminTab('boards')" id="tabBoards">게시판</span>
-              <span style="font-size:12px;color:#aaa;cursor:pointer" onclick="showAdminTab('home')" id="tabHome">홈 편집</span>
+              <span style="font-size:12px;color:#aaa;cursor:pointer" onclick="showAdminTab('posts')"  id="tabPosts">글 관리</span>
+              <span style="font-size:12px;color:#aaa;cursor:pointer" onclick="showAdminTab('home')"   id="tabHome">홈 편집</span>
             </div>
           </div>
           <!-- 회원 목록 탭 -->
@@ -252,6 +256,16 @@
               <button onclick="openAddBoard()" style="font-size:12px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300">+ 게시판 추가</button>
             </div>
             <div id="boardManageList"></div>
+          </div>
+          <!-- 글 관리 탭 -->
+          <div id="adminTabPosts" style="display:none;flex-direction:column;gap:16px">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+              <select id="adminPostBoardSel" style="border:none;border-bottom:1px solid #ccc;font-size:12px;font-family:inherit;font-weight:300;outline:none;padding:4px 0;background:transparent;color:#3a3a3a" onchange="loadAdminPosts()">
+                <option value="">게시판 선택</option>
+              </select>
+              <span style="font-size:11px;color:#bbb" id="adminPostCount"></span>
+            </div>
+            <div id="adminPostList"></div>
           </div>
           <!-- 홈 편집 탭 -->
           <div id="adminTabHome" style="display:none;flex-direction:column;flex:1;gap:24px">
