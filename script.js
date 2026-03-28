@@ -551,9 +551,10 @@ async function goList(b) {
 
     } else {
       // ── 목록형 (기본) ──
+      const adminOnly = board?.adminOnly || board?.type === 'single';
       h = `<div class="list-head">
         <span class="col-num">번호</span><span class="col-title">제목</span>
-        <span class="col-author">작성자</span><span class="col-date">날짜</span>
+        ${adminOnly ? '' : '<span class="col-author">작성자</span>'}<span class="col-date">날짜</span>
       </div>`;
       let num = snap.size;
       snap.forEach(d => {
@@ -564,7 +565,7 @@ async function goList(b) {
         h += `<div class="post-row" onclick="openPost('${p.id}')">
           <span class="col-num">${num--}</span>
           <span class="${cls}">${title}</span>
-          <span class="col-author">${esc(p.author)}</span>
+          ${adminOnly ? '' : `<span class="col-author">${esc(p.author)}</span>`}
           <span class="col-date">${fmt(p.createdAt)}</span>
         </div>`;
       });
@@ -588,7 +589,12 @@ async function openPost(pid) {
     await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
     show('viewPost');
     document.getElementById('pvTitle').textContent = (p.secret?'🔒 ':'')+p.title;
-    document.getElementById('pvMeta').innerHTML = `<span>${esc(p.author)}</span><span>${fmt(p.createdAt)}</span><span>조회 ${(p.views||0)+1}</span>`;
+    const board = boards.find(x => x.id === curBoard);
+    const adminOnly = board?.adminOnly || board?.type === 'single';
+    document.getElementById('pvMeta').innerHTML = `
+      ${adminOnly ? '' : `<span>${esc(p.author)}</span>`}
+      <span>${fmt(p.createdAt)}</span>
+      <span>조회 ${(p.views||0)+1}</span>`;
     document.getElementById('pvBody').innerHTML = p.content || '';
     document.getElementById('pvBody').style.lineHeight = p.lineHeight || '1.9';
     let acts = `<button onclick="goList()">목록</button>`;
@@ -1103,20 +1109,27 @@ async function saveMyInfo() {
   const oldPw  = document.getElementById('myOldPw').value;
   const newPw  = document.getElementById('myNewPw').value;
   const newPw2 = document.getElementById('myNewPw2').value;
-  if (!nick) { document.getElementById('myErr').textContent = '이름을 입력해주세요.'; return; }
+  const errEl  = document.getElementById('myErr');
+  errEl.textContent = '';
+
+  if (!nick) { errEl.textContent = '이름을 입력해주세요.'; return; }
+
+  // 비밀번호 변경 유효성 검사 (입력한 경우만)
+  if (newPw || newPw2 || oldPw) {
+    if (!oldPw)           { errEl.textContent = '현재 비밀번호를 입력해주세요.'; return; }
+    if (newPw.length < 6) { errEl.textContent = '새 비밀번호는 6자 이상이어야 합니다.'; return; }
+    if (newPw !== newPw2) { errEl.textContent = '새 비밀번호가 일치하지 않습니다.'; return; }
+  }
 
   showLoading();
   try {
     // 닉네임 저장
-    await updateDoc(doc(db,'users',me.uid), { nick });
+    await updateDoc(doc(db, 'users', me.uid), { nick });
     me.nick = nick;
     updateNav();
 
-    // 비밀번호 변경 (입력한 경우만)
+    // 비밀번호 변경
     if (newPw) {
-      if (newPw.length < 6)  { document.getElementById('myErr').textContent = '새 비밀번호는 6자 이상이어야 합니다.'; hideLoading(); return; }
-      if (newPw !== newPw2)  { document.getElementById('myErr').textContent = '새 비밀번호가 일치하지 않습니다.'; hideLoading(); return; }
-      if (!oldPw)            { document.getElementById('myErr').textContent = '현재 비밀번호를 입력해주세요.'; hideLoading(); return; }
       const user = auth.currentUser;
       const cred = EmailAuthProvider.credential(user.email, oldPw);
       await reauthenticateWithCredential(user, cred);
@@ -1125,7 +1138,11 @@ async function saveMyInfo() {
 
     toast('저장되었습니다.'); closeModal();
   } catch(e) {
-    document.getElementById('myErr').textContent = '현재 비밀번호가 올바르지 않습니다.';
+    if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+      errEl.textContent = '현재 비밀번호가 올바르지 않습니다.';
+    } else {
+      errEl.textContent = '저장 중 오류가 발생했습니다: ' + e.message;
+    }
   } finally { hideLoading(); }
 }
 
