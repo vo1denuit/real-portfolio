@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>비행님</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪽</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="toast" id="toast"></div>
+  <div class="loading-overlay" id="loadingOverlay"><div class="loading-spinner"></div></div>
+
+  <!-- ── 모달 ── -->
+  <div class="overlay" id="overlay">
+    <div class="modal" id="modalBox">
+
+      <!-- 로그인 -->
+      <div id="pLogin">
+        <div class="modal-title">로그인</div>
+        <div class="modal-row"><label>아이디</label><input type="text" id="liId"></div>
+        <div class="modal-row"><label>비밀번호</label><input type="password" id="liPw"></div>
+        <div class="modal-err" id="liErr"></div>
+        <button class="modal-btn" id="btnDoLogin">로그인</button>
+        <div class="modal-links"><span id="btnToReg">회원가입</span><span id="btnCloseModal1">닫기</span></div>
+      </div>
+
+      <!-- 회원가입 -->
+      <div id="pReg" style="display:none">
+        <div class="modal-title">회원가입</div>
+        <div class="modal-row"><label>아이디</label><input type="text" id="reId" placeholder="영문+숫자 4자 이상"></div>
+        <div class="modal-row"><label>이메일</label><input type="email" id="reEmail" placeholder="example@email.com"></div>
+        <div class="modal-row"><label>비밀번호</label><input type="password" id="rePw" placeholder="6자 이상"></div>
+        <div class="modal-row"><label>비밀번호 확인</label><input type="password" id="rePw2"></div>
+        <div class="modal-err" id="reErr"></div>
+        <button class="modal-btn" id="btnDoReg">가입</button>
+        <div class="modal-links"><span id="btnToLi">← 로그인</span><span id="btnCloseModal2">닫기</span></div>
+      </div>
+
+      <!-- 내 정보 -->
+      <div id="pMyInfo" style="display:none">
+        <div class="modal-title">내 정보</div>
+        <div class="modal-row"><label>아이디</label><input type="text" id="myId" disabled></div>
+        <div class="modal-row"><label>현재 비밀번호</label><input type="password" id="myOldPw"></div>
+        <div class="modal-row"><label>새 비밀번호</label><input type="password" id="myNewPw" placeholder="6자 이상"></div>
+        <div class="modal-row"><label>새 비밀번호 확인</label><input type="password" id="myNewPw2"></div>
+        <div class="modal-err" id="myErr"></div>
+        <button class="modal-btn" id="btnSaveMyInfo">저장</button>
+        <div class="modal-links"><span id="btnCloseModal3">닫기</span></div>
+      </div>
+
+      <!-- 회원 상세 -->
+      <div id="pUserDetail" style="display:none">
+        <div class="modal-title">회원 정보</div>
+        <div class="modal-row"><label>아이디</label><input type="text" id="udId" disabled></div>
+        <div class="modal-row"><label>이메일</label><input type="text" id="udEmail" disabled></div>
+        <div class="modal-row"><label>가입일</label><input type="text" id="udDate" disabled></div>
+        <div class="modal-row"><label>권한</label><input type="text" id="udRole" disabled></div>
+        <div class="modal-err" id="udErr"></div>
+        <button class="modal-btn" id="btnSaveUserDetail">저장</button>
+        <div class="modal-links">
+          <span id="udToggleAdminBtn"></span>
+          <span id="btnCloseModal4">닫기</span>
+        </div>
+      </div>
+
+      <!-- 게시판 추가 -->
+      <div id="pAddBoard" style="display:none">
+        <div class="modal-title">게시판 추가</div>
+        <div class="modal-row"><label>게시판 ID</label><input type="text" id="newBoardId" placeholder="영문+숫자 (예: travel)"></div>
+        <div class="modal-row"><label>게시판 이름</label><input type="text" id="newBoardName" placeholder="표시될 이름 (예: 여행)"></div>
+        <div class="modal-row">
+          <label>종류</label>
+          <select id="newBoardType" style="width:100%;border:none;border-bottom:1px solid #ccc;padding:5px 0;font-family:inherit;font-size:13px;font-weight:300;outline:none;background:transparent">
+            <option value="board">일반 게시판</option>
+            <option value="guest">방명록</option>
+            <option value="single">단일 페이지 (CV형)</option>
+          </select>
+        </div>
+        <div class="modal-row">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="newBoardAdminOnly" accent-color="#3a3a3a"> 관리자만 글쓰기 가능
+          </label>
+        </div>
+        <div class="modal-err" id="addBoardErr"></div>
+        <button class="modal-btn" id="btnSubmitAddBoard">추가</button>
+        <div class="modal-links"><span id="btnCloseModal5">닫기</span></div>
+      </div>
+
+      <button class="modal-close" id="btnModalClose">✕</button>
+    </div>
+  </div>
+
+  <!-- ── 본문 ── -->
+  <div class="wrap">
+    <div class="card">
+
+      <nav style="position:relative">
+        <a class="logo" id="logoBtn">비행님</a>
+
+        <!-- 로고 드롭다운 패널 -->
+        <div id="logoPanel" style="display:none;position:absolute;top:calc(100% + 10px);left:0;width:200px;background:#fff;border:1px solid #e8e8e8;padding:16px;z-index:50">
+          <button id="logoPanelClose" style="position:absolute;top:8px;right:10px;background:none;border:none;font-size:14px;color:#bbb;cursor:pointer;font-family:inherit;line-height:1">✕</button>
+          <!-- 프로필 이미지 -->
+          <div id="logoPanelImgWrap" style="margin-bottom:10px;display:none">
+            <img id="logoPanelImg" src="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;display:block">
+          </div>
+          <div id="logoPanelBio" style="font-size:12px;color:#888;font-weight:300;margin-bottom:12px;line-height:1.6;padding-right:16px"></div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <a id="logoPanelHome" style="font-size:12px;color:#3a3a3a;cursor:pointer;text-decoration:none;font-weight:300">home</a>
+            <a href="https://instagram.com/vo1denuit" target="_blank" style="font-size:12px;color:#aaa;text-decoration:none;font-weight:300">@vo1denuit</a>
+          </div>
+        </div>
+
+        <div class="nav-right" id="navLinks">
+          <span id="navAdmin"  style="display:none;color:#bbb">관리자</span>
+          <span id="navMyInfo" style="display:none;color:#bbb">내 정보</span>
+          <span id="navLogin">로그인</span>
+          <span id="navUser"   style="display:none"></span>
+          <span id="navLogout" style="display:none">로그아웃</span>
+        </div>
+      </nav>
+
+      <div class="board-area">
+
+        <!-- 홈 -->
+        <div class="home-area" id="homeArea">
+          <div id="homeContent" style="width:100%;height:100%"></div>
+        </div>
+
+        <!-- 목록 -->
+        <div class="board-inner" id="viewList">
+          <div class="board-top">
+            <span id="listName"></span>
+            <button onclick="goWrite()">글쓰기</button>
+          </div>
+          <div id="postList"></div>
+        </div>
+
+        <!-- 글 보기 -->
+        <div class="post-view" id="viewPost">
+          <div class="pv-title"   id="pvTitle"></div>
+          <div class="pv-meta"    id="pvMeta"></div>
+          <div class="pv-body"    id="pvBody"></div>
+          <div class="pv-actions" id="pvActions"></div>
+          <div class="comments"   id="pvComments"></div>
+        </div>
+
+        <!-- 글쓰기/수정 -->
+        <div class="write-area" id="viewWrite">
+          <div class="write-top">
+            <span id="writeLbl">글쓰기</span>
+            <button onclick="goList()">취소</button>
+          </div>
+          <div id="writeBody"></div>
+        </div>
+
+        <!-- 비밀글 잠금 -->
+        <div class="lock-view" id="viewLock">
+          <p>🔒 비밀글입니다.</p>
+          <div class="lock-row">
+            <input type="password" id="lockPw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doUnlock()">
+            <button onclick="doUnlock()">확인</button>
+          </div>
+          <div class="lock-err" id="lockErr"></div>
+          <button class="lock-back" id="lockBack">← 목록</button>
+        </div>
+
+        <!-- 단일 페이지 (CV형) -->
+        <div class="cv-view" id="viewSingle">
+          <div class="cv-top">
+            <span id="singleTitle"></span>
+            <button id="singleEditBtn" style="display:none">편집</button>
+          </div>
+          <div id="singleDisplay"><div id="singleBody"></div></div>
+          <div id="singleEditor" style="display:none;flex-direction:column;flex:1;gap:12px">
+            <div class="editor-toolbar">
+              <select id="singleFontSize" onchange="edCmdSingle('fontSize',this.value)">
+                <option value="1">아주 작게</option><option value="2">작게</option>
+                <option value="3" selected>보통</option><option value="4">크게</option>
+                <option value="5">아주 크게</option><option value="6">제목</option><option value="7">큰 제목</option>
+              </select>
+              <div class="tb-divider"></div>
+              <select id="singleLineHeight" onchange="setSingleLineHeight(this.value)" title="줄간격">
+                <option value="1">1배</option>
+                <option value="1.4">1.4배</option>
+                <option value="1.6">1.6배</option>
+                <option value="1.9" selected>1.9배</option>
+                <option value="2.2">2.2배</option>
+                <option value="2.5">2.5배</option>
+                <option value="3">3배</option>
+              </select>
+              <div class="tb-divider"></div>
+              <button class="tb-btn" onclick="edCmdSingle('bold')"><b>B</b></button>
+              <button class="tb-btn" onclick="edCmdSingle('italic')"><i>I</i></button>
+              <button class="tb-btn" onclick="edCmdSingle('underline')"><u>U</u></button>
+              <button class="tb-btn" onclick="edCmdSingle('strikeThrough')"><s>S</s></button>
+              <div class="tb-divider"></div>
+              <button class="tb-btn" onclick="edCmdSingle('justifyLeft')">≡</button>
+              <button class="tb-btn" onclick="edCmdSingle('justifyCenter')">☰</button>
+              <button class="tb-btn" onclick="edCmdSingle('justifyRight')">≡</button>
+              <div class="tb-divider"></div>
+              <button class="tb-btn" onclick="insertSingleImage()">🖼</button>
+              <button class="tb-btn" onclick="insertSingleVideo()">▶</button>
+              <input type="file" id="singleImgInput" accept="image/*" style="display:none" onchange="handleSingleImgUpload(event)">
+            </div>
+            <div class="editor-area" id="singleEditorArea" contenteditable="true"></div>
+            <div class="cv-editor-actions">
+              <button id="btnCancelSingle">취소</button>
+              <button class="btn-ok" id="btnSaveSingle">저장</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 방명록 -->
+        <div class="guest-view" id="viewGuest">
+          <div class="guest-top">
+            <span id="guestTitle">게스트북</span>
+            <span class="guest-count" id="guestCount"></span>
+          </div>
+          <div class="guestbook-form">
+            <div class="gf-row">
+              <input class="gf-input" id="gbName" placeholder="이름">
+              <label class="gf-secret-label"><input type="checkbox" id="gbSecret" onchange="toggleGbPw()"> 비밀</label>
+              <div class="gf-pw-wrap" id="gbPwWrap">
+                <span>비밀번호</span><input type="password" id="gbPw">
+              </div>
+            </div>
+            <textarea class="gf-textarea" id="gbText" placeholder="방명록을 남겨주세요 :)"></textarea>
+            <div class="gf-submit-row"><button onclick="submitGuest()">남기기</button></div>
+          </div>
+          <div class="guestbook-list" id="guestList"></div>
+        </div>
+
+        <!-- 관리자 -->
+        <div class="admin-view" id="viewAdmin">
+          <div class="admin-top">
+            <span id="adminTabTitle">관리자 — 회원 목록</span>
+            <div style="display:flex;gap:16px;align-items:center">
+              <span class="admin-count" id="adminUserCount"></span>
+              <span style="font-size:12px;color:#aaa;cursor:pointer" onclick="showAdminTab('users')" id="tabUsers">회원</span>
+              <span style="font-size:12px;color:#aaa;cursor:pointer" onclick="showAdminTab('boards')" id="tabBoards">게시판</span>
+              <span style="font-size:12px;color:#aaa;cursor:pointer" onclick="showAdminTab('home')" id="tabHome">홈 편집</span>
+            </div>
+          </div>
+          <!-- 회원 목록 탭 -->
+          <div id="adminTabUsers"><div id="adminUserList"></div></div>
+          <!-- 게시판 관리 탭 -->
+          <div id="adminTabBoards" style="display:none">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+              <button onclick="openAddBoard()" style="font-size:12px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300">+ 게시판 추가</button>
+            </div>
+            <div id="boardManageList"></div>
+          </div>
+          <!-- 홈 편집 탭 -->
+          <div id="adminTabHome" style="display:none;flex-direction:column;flex:1;gap:24px">
+
+            <!-- 한 줄 소개 -->
+            <div style="padding-bottom:20px;border-bottom:1px solid #eee">
+              <div style="font-size:11px;color:#aaa;margin-bottom:12px;letter-spacing:0.05em">로고 패널</div>
+              <!-- 프로필 이미지 -->
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+                <div id="bioImgPreview" style="width:44px;height:44px;border-radius:50%;background:#f0f0f0;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center">
+                  <span style="font-size:10px;color:#ccc">사진</span>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                  <input type="text" id="logoBioImgUrl" placeholder="이미지 URL" style="border:none;border-bottom:1px solid #ccc;font-size:12px;font-family:inherit;font-weight:300;color:#3a3a3a;outline:none;padding:4px 0;background:transparent;width:100%" oninput="previewBioImg(this.value)">
+                  <label style="font-size:11px;color:#aaa;cursor:pointer;display:flex;align-items:center;gap:4px">
+                    <input type="file" id="logoBioImgFile" accept="image/*" style="display:none" onchange="uploadBioImg(event)">
+                    <span onclick="document.getElementById('logoBioImgFile').click()" style="color:#aaa;font-size:11px;cursor:pointer">파일 업로드</span>
+                  </label>
+                </div>
+              </div>
+              <!-- 한 줄 소개 -->
+              <div style="display:flex;gap:12px;align-items:center">
+                <input type="text" id="logoBioInput" placeholder="짧은 소개 한 줄을 입력하세요" style="flex:1;border:none;border-bottom:1px solid #ccc;font-size:13px;font-family:inherit;font-weight:300;color:#3a3a3a;outline:none;padding:5px 0;background:transparent">
+                <button onclick="saveBio()" style="font-size:12px;color:#3a3a3a;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300;flex-shrink:0">저장</button>
+              </div>
+            </div>
+
+            <!-- 홈 화면 편집 -->
+            <div style="display:flex;flex-direction:column;flex:1;gap:16px">
+              <div style="font-size:11px;color:#aaa;letter-spacing:0.05em">레이아웃 선택</div>
+
+              <!-- 템플릿 카드 -->
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="homeTemplateGrid"></div>
+
+              <!-- 추가 옵션 (좌우분할 이미지 URL) -->
+              <div id="homeSplitImgWrap" style="display:none;gap:8px;align-items:center">
+                <span style="font-size:11px;color:#aaa;flex-shrink:0">이미지 URL</span>
+                <input type="text" id="homeSplitImg" placeholder="https://..." style="flex:1;border:none;border-bottom:1px solid #ccc;font-size:12px;font-family:inherit;font-weight:300;color:#3a3a3a;outline:none;padding:4px 0;background:transparent">
+                <input type="file" id="homeSplitImgFile" accept="image/*" style="display:none" onchange="handleHomeSplitImg(event)">
+                <span onclick="document.getElementById('homeSplitImgFile').click()" style="font-size:11px;color:#aaa;cursor:pointer;flex-shrink:0">업로드</span>
+              </div>
+              <div id="homeTopImgWrap" style="display:none;gap:8px;align-items:center">
+                <span style="font-size:11px;color:#aaa;flex-shrink:0">헤더 이미지 URL</span>
+                <input type="text" id="homeTopImg" placeholder="https://..." style="flex:1;border:none;border-bottom:1px solid #ccc;font-size:12px;font-family:inherit;font-weight:300;color:#3a3a3a;outline:none;padding:4px 0;background:transparent">
+                <input type="file" id="homeTopImgFile" accept="image/*" style="display:none" onchange="handleHomeTopImg(event)">
+                <span onclick="document.getElementById('homeTopImgFile').click()" style="font-size:11px;color:#aaa;cursor:pointer;flex-shrink:0">업로드</span>
+              </div>
+
+              <!-- 에디터 툴바 -->
+              <div class="editor-toolbar">
+                <select onchange="homeEdCmd('fontSize',this.value)">
+                  <option value="1">아주 작게</option><option value="2">작게</option>
+                  <option value="3" selected>보통</option><option value="4">크게</option>
+                  <option value="5">아주 크게</option><option value="6">제목</option><option value="7">큰 제목</option>
+                </select>
+                <div class="tb-divider"></div>
+                <select id="homeLineHeight" onchange="setHomeLineHeight(this.value)">
+                  <option value="1">1배</option><option value="1.4">1.4배</option>
+                  <option value="1.6">1.6배</option><option value="1.9" selected>1.9배</option>
+                  <option value="2.2">2.2배</option><option value="2.5">2.5배</option><option value="3">3배</option>
+                </select>
+                <div class="tb-divider"></div>
+                <button class="tb-btn" onclick="homeEdCmd('bold')"><b>B</b></button>
+                <button class="tb-btn" onclick="homeEdCmd('italic')"><i>I</i></button>
+                <button class="tb-btn" onclick="homeEdCmd('underline')"><u>U</u></button>
+                <button class="tb-btn" onclick="homeEdCmd('strikeThrough')"><s>S</s></button>
+                <div class="tb-divider"></div>
+                <button class="tb-btn" onclick="homeEdCmd('justifyLeft')">≡</button>
+                <button class="tb-btn" onclick="homeEdCmd('justifyCenter')">☰</button>
+                <button class="tb-btn" onclick="homeEdCmd('justifyRight')">≡</button>
+                <div class="tb-divider"></div>
+                <button class="tb-btn" onclick="insertHomeImage()">🖼</button>
+                <button class="tb-btn" onclick="insertHomeVideo()">▶</button>
+                <input type="file" id="homeImgInput" accept="image/*" style="display:none" onchange="handleHomeImgUpload(event)">
+              </div>
+              <div class="editor-area" id="homeEditorArea" contenteditable="true" style="min-height:240px"></div>
+              <div style="display:flex;justify-content:flex-end">
+                <button onclick="saveHomeContent()" style="font-size:12px;color:#3a3a3a;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300">저장</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /board-area -->
+    </div><!-- /card -->
+  </div><!-- /wrap -->
+
+  <!-- 홈 버튼 -->
+  <div id="floatHomeBtn" onclick="goHome()" style="position:fixed;bottom:32px;right:48px;cursor:pointer;font-size:14px;color:#aaa;font-family:inherit;font-weight:300;opacity:0.5;transition:opacity 0.2s;z-index:50;user-select:none;display:none;letter-spacing:0.05em" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">home</div>
+
+  <script type="module" src="script.js"></script>
+  <script>
+  // Tinkerbell Magic Sparkle (c)2005-13 mf2fm web-design
+  var colour="random";
+  var sparkles=50;
+  var x=ox=400, y=oy=300;
+  var swide=800, shigh=600, sleft=sdown=0;
+  var tiny=[], star=[], starv=[], starx=[], stary=[], tinyx=[], tinyy=[], tinyv=[];
+
+  window.addEventListener('load', function() {
+    for (var i=0; i<sparkles; i++) {
+      var rats=createDiv(3,3);
+      rats.style.visibility="hidden"; rats.style.zIndex="999";
+      document.body.appendChild(tiny[i]=rats);
+      starv[i]=0; tinyv[i]=0;
+      var rats=createDiv(5,5);
+      rats.style.backgroundColor="transparent"; rats.style.visibility="hidden"; rats.style.zIndex="999";
+      var rlef=createDiv(1,5), rdow=createDiv(5,1);
+      rats.appendChild(rlef); rats.appendChild(rdow);
+      rlef.style.top="2px"; rlef.style.left="0px";
+      rdow.style.top="0px"; rdow.style.left="2px";
+      document.body.appendChild(star[i]=rats);
+    }
+    set_width(); sparkle();
+  });
+
+  function sparkle() {
+    if (Math.abs(x-ox)>1 || Math.abs(y-oy)>1) {
+      ox=x; oy=y;
+      for (var c=0; c<sparkles; c++) if (!starv[c]) {
+        star[c].style.left=(starx[c]=x)+"px";
+        star[c].style.top=(stary[c]=y+1)+"px";
+        star[c].style.clip="rect(0px, 5px, 5px, 0px)";
+        star[c].childNodes[0].style.backgroundColor=star[c].childNodes[1].style.backgroundColor=(colour=="random")?newColour():colour;
+        star[c].style.visibility="visible"; starv[c]=50; break;
+      }
+    }
+    for (var c=0; c<sparkles; c++) {
+      if (starv[c]) update_star(c);
+      if (tinyv[c]) update_tiny(c);
+    }
+    setTimeout(sparkle, 40);
+  }
+
+  function update_star(i) {
+    if (--starv[i]==25) star[i].style.clip="rect(1px, 4px, 4px, 1px)";
+    if (starv[i]) {
+      stary[i]+=1+Math.random()*3; starx[i]+=(i%5-2)/5;
+      if (stary[i]<shigh+sdown) { star[i].style.top=stary[i]+"px"; star[i].style.left=starx[i]+"px"; }
+      else { star[i].style.visibility="hidden"; starv[i]=0; return; }
+    } else {
+      tinyv[i]=50;
+      tiny[i].style.top=(tinyy[i]=stary[i])+"px"; tiny[i].style.left=(tinyx[i]=starx[i])+"px";
+      tiny[i].style.width="2px"; tiny[i].style.height="2px";
+      tiny[i].style.backgroundColor=star[i].childNodes[0].style.backgroundColor;
+      star[i].style.visibility="hidden"; tiny[i].style.visibility="visible";
+    }
+  }
+
+  function update_tiny(i) {
+    if (--tinyv[i]==25) { tiny[i].style.width="1px"; tiny[i].style.height="1px"; }
+    if (tinyv[i]) {
+      tinyy[i]+=1+Math.random()*3; tinyx[i]+=(i%5-2)/5;
+      if (tinyy[i]<shigh+sdown) { tiny[i].style.top=tinyy[i]+"px"; tiny[i].style.left=tinyx[i]+"px"; }
+      else { tiny[i].style.visibility="hidden"; tinyv[i]=0; return; }
+    } else tiny[i].style.visibility="hidden";
+  }
+
+  document.addEventListener('mousemove', function(e) { y=e.pageY; x=e.pageX; });
+
+  window.addEventListener('scroll', set_scroll);
+  function set_scroll() {
+    sdown = self.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    sleft = self.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0;
+  }
+
+  window.addEventListener('resize', set_width);
+  function set_width() {
+    swide = self.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || 800;
+    shigh = self.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || 600;
+  }
+
+  function createDiv(h,w) {
+    var div=document.createElement("div");
+    div.style.position="absolute"; div.style.height=h+"px"; div.style.width=w+"px"; div.style.overflow="hidden";
+    return div;
+  }
+
+  function newColour() {
+    var c=[255, Math.floor(Math.random()*256), 0];
+    c[2]=Math.floor(Math.random()*(256-c[1]/2));
+    c.sort(function(){ return 0.5-Math.random(); });
+    return "rgb("+c[0]+","+c[1]+","+c[2]+")";
+  }
+  </script>
+</body>
+</html>
