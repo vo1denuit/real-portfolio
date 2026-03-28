@@ -415,13 +415,14 @@ async function goGuest(b) {
   curBoard = b.id;
   show('viewGuest');
   document.getElementById('guestTitle').textContent = b.name;
-  if (me) document.getElementById('gbName').value = me.id;
+  if (me) document.getElementById('gbName').value = me.nick || me.id;
   showLoading();
   try { await renderGuest(); } finally { hideLoading(); }
 }
 
 async function renderGuest() {
-  const q = query(collection(db, 'guest_' + curBoard), orderBy('createdAt', 'desc'));
+  const colName = 'guest_' + curBoard;
+  const q = query(collection(db, colName), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
   document.getElementById('guestCount').textContent = snap.size + '개의 방명록';
   if (snap.empty) {
@@ -451,7 +452,7 @@ function toggleGbPw() {
 }
 
 async function submitGuest() {
-  const author = me ? me.id : (document.getElementById('gbName').value.trim() || '익명');
+  const author = me ? (me.nick || me.id) : (document.getElementById('gbName').value.trim() || '익명');
   const text   = document.getElementById('gbText').value.trim();
   const isSec  = document.getElementById('gbSecret').checked;
   const pw     = document.getElementById('gbPw').value || '';
@@ -628,7 +629,7 @@ async function submitCmt() {
   const text = document.getElementById('cmtTxt').value.trim();
   if (!text) { toast('댓글을 입력해주세요.'); return; }
   const isSec  = document.getElementById('cmtSec').checked;
-  const author = me ? me.id : (document.getElementById('cmtName')?.value.trim()||'익명');
+  const author = me ? (me.nick || me.id) : (document.getElementById('cmtName')?.value.trim()||'익명');
   showLoading();
   try {
     await addDoc(collection(db, 'boards', curBoard, 'posts', curPost, 'comments'), {
@@ -785,7 +786,7 @@ async function submitWF() {
   if (!title)        { toast('제목을 입력해주세요.'); return; }
   if (!content || content==='<br>') { toast('내용을 입력해주세요.'); return; }
   if (isSec && !sPw) { toast('비밀번호를 입력해주세요.'); return; }
-  const author = me ? me.id : (document.getElementById('wfA')?.value.trim()||'익명');
+  const author = me ? (me.nick || me.id) : (document.getElementById('wfA')?.value.trim()||'익명');
   showLoading();
   try {
     if (editPost) {
@@ -816,15 +817,97 @@ async function goAdmin() {
 }
 
 function showAdminTab(tab) {
-  ['users','boards','home'].forEach(t => {
-    document.getElementById('adminTab' + t.charAt(0).toUpperCase() + t.slice(1)).style.display = 'none';
+  ['users','boards','posts','home'].forEach(t => {
+    const el = document.getElementById('adminTab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (el) el.style.display = 'none';
   });
-  document.getElementById('adminTab' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = 'flex';
-  document.getElementById('adminTab' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.flexDirection = 'column';
+  const target = document.getElementById('adminTab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+  if (target) { target.style.display = 'flex'; target.style.flexDirection = 'column'; }
 
   if (tab === 'users')  renderAdmin();
   if (tab === 'boards') renderBoardManage();
+  if (tab === 'posts')  initAdminPosts();
   if (tab === 'home')   loadHomeEditor();
+}
+
+// ── 관리자 글 관리 ───────────────────────────────────────
+async function initAdminPosts() {
+  // 게시판 셀렉트 채우기
+  const sel = document.getElementById('adminPostBoardSel');
+  sel.innerHTML = '<option value="">게시판 선택</option>';
+  boards.filter(b => b.type === 'board' || b.type === 'single').forEach(b => {
+    sel.innerHTML += `<option value="${esc(b.id)}">${esc(b.name)}</option>`;
+  });
+  // 방명록도 추가
+  boards.filter(b => b.type === 'guest').forEach(b => {
+    sel.innerHTML += `<option value="guest_${esc(b.id)}">${esc(b.name)} (방명록)</option>`;
+  });
+  document.getElementById('adminPostList').innerHTML = '';
+  document.getElementById('adminPostCount').textContent = '';
+}
+
+async function loadAdminPosts() {
+  const sel   = document.getElementById('adminPostBoardSel');
+  const val   = sel.value;
+  if (!val) return;
+  showLoading();
+  try {
+    const isGuest = val.startsWith('guest_');
+    const colPath = isGuest ? val : `boards/${val}/posts`;
+    const q = isGuest
+      ? query(collection(db, colPath), orderBy('createdAt', 'desc'))
+      : query(collection(db, 'boards', val, 'posts'), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    document.getElementById('adminPostCount').textContent = `${snap.size}개`;
+
+    if (snap.empty) {
+      document.getElementById('adminPostList').innerHTML = `<div class="empty">글이 없습니다.</div>`;
+      return;
+    }
+
+    let h = `<div class="list-head">
+      <span class="col-title">${isGuest ? '내용' : '제목'}</span>
+      <span class="col-author">작성자</span>
+      <span class="col-date">날짜</span>
+      <span style="width:80px;text-align:right;font-size:11px;color:#aaa;flex-shrink:0">관리</span>
+    </div>`;
+
+    snap.forEach(d => {
+      const p = { id: d.id, ...d.data() };
+      const title = isGuest
+        ? esc(p.text||'').slice(0,40) + (p.text?.length > 40 ? '...' : '')
+        : esc(p.title||'');
+      h += `<div class="post-row" style="cursor:default">
+        <span class="col-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.secret?'🔒 ':''}${title}</span>
+        <span class="col-author">${esc(p.author||'')}</span>
+        <span class="col-date">${fmt(p.createdAt)}</span>
+        <span style="width:80px;flex-shrink:0;display:flex;justify-content:flex-end;gap:10px">
+          ${!isGuest ? `<button onclick="adminEditPost('${val}','${p.id}')" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300">수정</button>` : ''}
+          <button onclick="adminDelPost('${val}','${p.id}','${isGuest}')" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300">삭제</button>
+        </span>
+      </div>`;
+    });
+    document.getElementById('adminPostList').innerHTML = h;
+  } finally { hideLoading(); }
+}
+
+async function adminDelPost(boardId, postId, isGuest) {
+  if (!confirm('삭제할까요?')) return;
+  showLoading();
+  try {
+    if (isGuest === 'true') {
+      await deleteDoc(doc(db, boardId, postId));
+    } else {
+      await deleteDoc(doc(db, 'boards', boardId, 'posts', postId));
+    }
+    toast('삭제되었습니다.');
+    await loadAdminPosts();
+  } finally { hideLoading(); }
+}
+
+async function adminEditPost(boardId, postId) {
+  curBoard = boardId;
+  await goEdit(postId);
 }
 
 async function renderAdmin() {
@@ -835,7 +918,7 @@ async function renderAdmin() {
     const u = { uid: d.id, ...d.data() };
     const isMe = u.uid === me.uid;
     h += `<div class="admin-row">
-      <span class="admin-id">${esc(u.id||'')}</span>
+      <span class="admin-id">${esc(u.nick||u.id||'')}</span>
       <span class="admin-role">${u.admin?'관리자':'회원'}</span>
       <span class="admin-date">${u.joinDate||'-'}</span>
       <span class="admin-actions">
@@ -867,6 +950,7 @@ async function openUserDetail(uid) {
   const u = snap.data();
   showModalPane('pUserDetail');
   document.getElementById('udId').value    = u.id||'';
+  document.getElementById('udNick').value  = u.nick||u.id||'';
   document.getElementById('udEmail').value = u.email||'';
   document.getElementById('udDate').value  = u.joinDate||'-';
   document.getElementById('udRole').value  = u.admin?'관리자':'일반 회원';
@@ -875,7 +959,15 @@ async function openUserDetail(uid) {
   openModalRaw();
 }
 
-async function saveUserDetail() { toast('비밀번호 변경은 Firebase Console에서 직접 해주세요.'); closeModal(); }
+async function saveUserDetail() {
+  const nick = document.getElementById('udNick').value.trim();
+  if (!nick) { document.getElementById('udErr').textContent = '이름을 입력해주세요.'; return; }
+  showLoading();
+  try {
+    await updateDoc(doc(db,'users',detailUid), { nick });
+    toast('이름이 변경되었습니다.'); closeModal(); await renderAdmin();
+  } finally { hideLoading(); }
+}
 
 async function toggleAdminFromDetail() {
   const snap = await getDoc(doc(db,'users',detailUid));
@@ -997,27 +1089,41 @@ async function saveBoards() {
 // ── 내 정보 ─────────────────────────────────────────────
 function openMyInfo() {
   showModalPane('pMyInfo');
-  document.getElementById('myId').value = me.id;
-  document.getElementById('myOldPw').value = '';
-  document.getElementById('myNewPw').value = '';
+  document.getElementById('myId').value   = me.id;
+  document.getElementById('myNick').value = me.nick || me.id;
+  document.getElementById('myOldPw').value  = '';
+  document.getElementById('myNewPw').value  = '';
   document.getElementById('myNewPw2').value = '';
   document.getElementById('myErr').textContent = '';
   openModalRaw();
 }
 
 async function saveMyInfo() {
+  const nick   = document.getElementById('myNick').value.trim();
   const oldPw  = document.getElementById('myOldPw').value;
   const newPw  = document.getElementById('myNewPw').value;
   const newPw2 = document.getElementById('myNewPw2').value;
-  if (newPw.length < 6)  { document.getElementById('myErr').textContent = '새 비밀번호는 6자 이상이어야 합니다.'; return; }
-  if (newPw !== newPw2)  { document.getElementById('myErr').textContent = '새 비밀번호가 일치하지 않습니다.'; return; }
+  if (!nick) { document.getElementById('myErr').textContent = '이름을 입력해주세요.'; return; }
+
   showLoading();
   try {
-    const user = auth.currentUser;
-    const cred = EmailAuthProvider.credential(user.email, oldPw);
-    await reauthenticateWithCredential(user, cred);
-    await updatePassword(user, newPw);
-    toast('비밀번호가 변경되었습니다.'); closeModal();
+    // 닉네임 저장
+    await updateDoc(doc(db,'users',me.uid), { nick });
+    me.nick = nick;
+    updateNav();
+
+    // 비밀번호 변경 (입력한 경우만)
+    if (newPw) {
+      if (newPw.length < 6)  { document.getElementById('myErr').textContent = '새 비밀번호는 6자 이상이어야 합니다.'; hideLoading(); return; }
+      if (newPw !== newPw2)  { document.getElementById('myErr').textContent = '새 비밀번호가 일치하지 않습니다.'; hideLoading(); return; }
+      if (!oldPw)            { document.getElementById('myErr').textContent = '현재 비밀번호를 입력해주세요.'; hideLoading(); return; }
+      const user = auth.currentUser;
+      const cred = EmailAuthProvider.credential(user.email, oldPw);
+      await reauthenticateWithCredential(user, cred);
+      await updatePassword(user, newPw);
+    }
+
+    toast('저장되었습니다.'); closeModal();
   } catch(e) {
     document.getElementById('myErr').textContent = '현재 비밀번호가 올바르지 않습니다.';
   } finally { hideLoading(); }
@@ -1052,13 +1158,15 @@ async function doLogin() {
 }
 
 async function doReg() {
-  const id    = document.getElementById('reId').value.trim();
-  const email = document.getElementById('reEmail').value.trim();
-  const pw    = document.getElementById('rePw').value;
-  const pw2   = document.getElementById('rePw2').value;
+  const id   = document.getElementById('reId').value.trim();
+  const nick = document.getElementById('reNick').value.trim();
+  const email= document.getElementById('reEmail').value.trim();
+  const pw   = document.getElementById('rePw').value;
+  const pw2  = document.getElementById('rePw2').value;
   document.getElementById('reErr').textContent = '';
   if (id.length < 4)   { document.getElementById('reErr').textContent = '아이디는 4자 이상이어야 합니다.'; return; }
   if (!/^[a-zA-Z0-9_]+$/.test(id)) { document.getElementById('reErr').textContent = '아이디는 영문/숫자/밑줄만 가능합니다.'; return; }
+  if (!nick)           { document.getElementById('reErr').textContent = '이름(닉네임)을 입력해주세요.'; return; }
   if (!email)          { document.getElementById('reErr').textContent = '이메일을 입력해주세요.'; return; }
   if (pw.length < 6)   { document.getElementById('reErr').textContent = '비밀번호는 6자 이상이어야 합니다.'; return; }
   if (pw !== pw2)      { document.getElementById('reErr').textContent = '비밀번호가 일치하지 않습니다.'; return; }
@@ -1068,7 +1176,7 @@ async function doReg() {
   showLoading();
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, pw);
-    await setDoc(doc(db,'users',cred.user.uid), { id, email, admin: false, joinDate: fmtNow() });
+    await setDoc(doc(db,'users',cred.user.uid), { id, nick, email, admin: false, joinDate: fmtNow() });
     toast('가입 완료! 로그인해주세요.'); toLi();
   } catch(e) {
     document.getElementById('reErr').textContent = '이미 사용 중인 이메일이거나 오류가 발생했습니다.';
@@ -1082,7 +1190,7 @@ onAuthStateChanged(auth, async user => {
     const snap = await getDoc(doc(db,'users',user.uid));
     if (snap.exists()) {
       const data = snap.data();
-      me = { uid: user.uid, id: data.id, email: user.email, admin: !!data.admin };
+      me = { uid: user.uid, id: data.id, nick: data.nick || data.id, email: user.email, admin: !!data.admin };
     }
   } else { me = null; }
   updateNav();
@@ -1094,7 +1202,7 @@ function updateNav() {
   document.getElementById('navLogout').style.display  = me ? '' : 'none';
   document.getElementById('navAdmin').style.display   = me?.admin ? '' : 'none';
   document.getElementById('navMyInfo').style.display  = me ? '' : 'none';
-  if (me) document.getElementById('navUser').textContent = me.id;
+  if (me) document.getElementById('navUser').textContent = me.nick || me.id;
 }
 
 document.getElementById('overlay').addEventListener('click', e => {
@@ -1173,6 +1281,7 @@ Object.assign(window, {
   setHomeLineHeight, homeEdCmd, insertHomeImage, insertHomeVideo, handleHomeImgUpload,
   selectHomeLayout, handleHomeSplitImg, handleHomeTopImg,
   startEditBoard, saveEditBoard, toggleAdminOnly, cycleViewMode,
+  loadAdminPosts, adminDelPost, adminEditPost,
   edCmd, setLineHeight, setSingleLineHeight, insertImage, insertVideo, insertFile, handleImgUpload, handleFileUpload, togglePw
 });
 
