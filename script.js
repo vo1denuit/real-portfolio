@@ -34,6 +34,142 @@ function fmt(ts) {
 }
 function fmtNow() { return fmt(new Date()); }
 
+// ── 팝업 시스템 ──────────────────────────────────────────
+let popups = []; // [{ id, title, content, enabled }]
+let curPopupIdx = null; // 현재 편집 중인 팝업 인덱스
+
+function closePopup() {
+  document.getElementById('sitePopup').style.display = 'none';
+  const pid = document.getElementById('sitePopup').dataset.currentId;
+  if (pid) sessionStorage.setItem('popup_closed_' + pid, '1');
+}
+
+async function loadPopup() {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'popups'));
+    if (!snap.exists()) return;
+    const list = snap.data().list || [];
+    const active = list.filter(p => p.enabled && p.content);
+    // 아직 안 닫은 팝업 찾기
+    const toShow = active.find(p => !sessionStorage.getItem('popup_closed_' + p.id));
+    if (!toShow) return;
+    document.getElementById('sitePopupContent').innerHTML = toShow.content;
+    document.getElementById('sitePopup').dataset.currentId = toShow.id;
+    document.getElementById('sitePopup').style.display = 'flex';
+  } catch(e) { console.error('팝업 로드 오류:', e); }
+}
+
+async function loadPopupEditor() {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'popups'));
+    popups = snap.exists() ? (snap.data().list || []) : [];
+  } catch(e) { popups = []; }
+  renderPopupList();
+}
+
+function renderPopupList() {
+  const el = document.getElementById('popupManageList');
+  if (!el) return;
+  if (!popups.length) {
+    el.innerHTML = `<div style="font-size:12px;color:#ccc;padding:8px 0">팝업이 없습니다.</div>`;
+    return;
+  }
+  el.innerHTML = popups.map((p, i) => `
+    <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <span style="font-size:12px;color:#3a3a3a;flex:1">${esc(p.title||'제목 없음')}</span>
+      <span style="font-size:11px;color:${p.enabled?'#5a9a5a':'#ccc'}">${p.enabled?'활성':'비활성'}</span>
+      <button onclick="editPopup(${i})" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit">수정</button>
+      <button onclick="deletePopup(${i})" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit">삭제</button>
+    </div>`).join('');
+}
+
+function openAddPopup() {
+  curPopupIdx = null;
+  showPopupEditForm({ title: '', content: '', enabled: true });
+}
+
+function editPopup(i) {
+  curPopupIdx = i;
+  showPopupEditForm(popups[i]);
+}
+
+function showPopupEditForm(p) {
+  const el = document.getElementById('popupManageList');
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+      <input type="text" id="popupTitleInput" placeholder="팝업 제목 (관리용)" value="${esc(p.title||'')}"
+        style="border:none;border-bottom:1px solid #ccc;font-size:13px;font-family:inherit;font-weight:300;color:#3a3a3a;outline:none;padding:5px 0;background:transparent">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer">
+        <input type="checkbox" id="popupEnabledInput" ${p.enabled?'checked':''} accent-color="#3a3a3a"> 활성화
+      </label>
+      <div class="editor-toolbar">
+        <button class="tb-btn" onclick="popupEdCmd('bold')"><b>B</b></button>
+        <button class="tb-btn" onclick="popupEdCmd('italic')"><i>I</i></button>
+        <button class="tb-btn" onclick="popupEdCmd('underline')"><u>U</u></button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn" onclick="popupEdCmd('justifyLeft')">≡</button>
+        <button class="tb-btn" onclick="popupEdCmd('justifyCenter')">☰</button>
+        <button class="tb-btn" onclick="popupEdCmd('justifyRight')">≡</button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn" onclick="insertPopupImage()">🖼</button>
+        <input type="file" id="popupImgInput" accept="image/*" style="display:none" onchange="handlePopupImgUpload(event)">
+      </div>
+      <div class="editor-area" id="popupEditorArea" contenteditable="true" style="min-height:120px">${p.content||''}</div>
+      <div style="display:flex;justify-content:flex-end;gap:12px">
+        <button onclick="loadPopupEditor()" style="font-size:12px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300">취소</button>
+        <button onclick="savePopup()" style="font-size:12px;color:#3a3a3a;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300">저장</button>
+      </div>
+    </div>`;
+}
+
+async function savePopup() {
+  const title   = document.getElementById('popupTitleInput')?.value.trim() || '';
+  const content = document.getElementById('popupEditorArea')?.innerHTML.trim() || '';
+  const enabled = document.getElementById('popupEnabledInput')?.checked ?? true;
+  const id = curPopupIdx !== null ? popups[curPopupIdx].id : Date.now().toString();
+
+  if (curPopupIdx !== null) {
+    popups[curPopupIdx] = { id, title, content, enabled };
+  } else {
+    popups.push({ id, title, content, enabled });
+  }
+
+  showLoading();
+  try {
+    await setDoc(doc(db, 'config', 'popups'), { list: popups });
+    toast('저장되었습니다.');
+    curPopupIdx = null;
+    renderPopupList();
+  } finally { hideLoading(); }
+}
+
+async function deletePopup(i) {
+  if (!confirm('팝업을 삭제할까요?')) return;
+  popups.splice(i, 1);
+  showLoading();
+  try {
+    await setDoc(doc(db, 'config', 'popups'), { list: popups });
+    toast('삭제되었습니다.');
+    renderPopupList();
+  } finally { hideLoading(); }
+}
+
+function popupEdCmd(cmd) {
+  document.getElementById('popupEditorArea')?.focus();
+  document.execCommand('styleWithCSS', false, true);
+  document.execCommand(cmd, false, null);
+}
+function insertPopupImage() { document.getElementById('popupImgInput')?.click(); }
+function handlePopupImgUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('popupEditorArea')?.focus();
+    document.execCommand('insertHTML', false, `<img src="${ev.target.result}" style="max-width:100%;height:auto;display:block;margin:8px 0">`);
+  };
+  reader.readAsDataURL(file); e.target.value = '';
+}
+
 // ── 로고 패널 ────────────────────────────────────────────
 function toggleLogoPanel() {
   const panel = document.getElementById('logoPanel');
@@ -235,6 +371,7 @@ async function loadHomeEditor() {
 
   renderHomeTemplateGrid();
   selectHomeLayout(curHomeLayout);
+  await loadPopupEditor();
 
   try {
     const bioSnap = await getDoc(doc(db, 'config', 'logoBio'));
@@ -1412,6 +1549,9 @@ function bindEvents() {
   document.getElementById('liPw').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
   // 모달 바깥 클릭
+  document.getElementById('sitePopup').addEventListener('click', e => {
+    if (e.target === document.getElementById('sitePopup')) closePopup();
+  });
   document.getElementById('overlay').addEventListener('click', e => {
     if (e.target === document.getElementById('overlay')) closeModal();
   });
@@ -1436,6 +1576,8 @@ Object.assign(window, {
   openModal, closeModal, toReg, toLi, doLogin, doReg, doLogout,
   openMyInfo, saveMyInfo, openUserDetail, saveUserDetail, toggleAdminFromDetail, toggleAdmin, deleteUser,
   showAdminTab, renderBoardManage, moveBoardUp, moveBoardDown, deleteBoard, openAddBoard, submitAddBoard, saveHomeContent, saveBio, previewBioImg, uploadBioImg,
+  savePopup, closePopup, popupEdCmd, insertPopupImage, handlePopupImgUpload,
+  openAddPopup, editPopup, deletePopup,
   setHomeLineHeight, homeEdCmd, insertHomeImage, insertHomeVideo, handleHomeImgUpload,
   selectHomeLayout, handleHomeSplitImg, handleHomeTopImg,
   startEditBoard, saveEditBoard, toggleAdminOnly, cycleViewMode,
@@ -1469,6 +1611,7 @@ window.addEventListener('popstate', routeFromHash);
   await loadBoards();
   await loadHome();
   await loadLogoBio();
+  await loadPopup();
   document.getElementById('floatHomeBtn').style.display = 'none';
   routeFromHash();
 })();
