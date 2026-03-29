@@ -105,7 +105,6 @@
         <!-- 로고 드롭다운 패널 -->
         <div id="logoPanel" style="display:none;position:absolute;top:calc(100% + 10px);left:0;width:200px;background:#fff;border:1px solid #e8e8e8;padding:16px;z-index:50">
           <button id="logoPanelClose" style="position:absolute;top:8px;right:10px;background:none;border:none;font-size:14px;color:#bbb;cursor:pointer;font-family:inherit;line-height:1">✕</button>
-          <!-- 프로필 이미지 -->
           <div id="logoPanelImgWrap" style="margin-bottom:10px;display:none">
             <img id="logoPanelImg" src="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;display:block">
           </div>
@@ -189,7 +188,7 @@
                 <option value="1">1배</option>
                 <option value="1.4">1.4배</option>
                 <option value="1.6">1.6배</option>
-                <option value="1.9" selected>1.9배</option>
+                <option value="1.6" selected>1.6배</option>
                 <option value="2.2">2.2배</option>
                 <option value="2.5">2.5배</option>
                 <option value="3">3배</option>
@@ -273,7 +272,6 @@
             <!-- 한 줄 소개 -->
             <div style="padding-bottom:20px;border-bottom:1px solid #eee">
               <div style="font-size:11px;color:#aaa;margin-bottom:12px;letter-spacing:0.05em">로고 패널</div>
-              <!-- 프로필 이미지 -->
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
                 <div id="bioImgPreview" style="width:44px;height:44px;border-radius:50%;background:#f0f0f0;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center">
                   <span style="font-size:10px;color:#ccc">사진</span>
@@ -286,7 +284,6 @@
                   </label>
                 </div>
               </div>
-              <!-- 한 줄 소개 -->
               <div style="display:flex;gap:12px;align-items:center">
                 <input type="text" id="logoBioInput" placeholder="짧은 소개 한 줄을 입력하세요" style="flex:1;border:none;border-bottom:1px solid #ccc;font-size:13px;font-family:inherit;font-weight:300;color:#3a3a3a;outline:none;padding:5px 0;background:transparent">
                 <button onclick="saveBio()" style="font-size:12px;color:#3a3a3a;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300;flex-shrink:0">저장</button>
@@ -296,11 +293,7 @@
             <!-- 홈 화면 편집 -->
             <div style="display:flex;flex-direction:column;flex:1;gap:16px">
               <div style="font-size:11px;color:#aaa;letter-spacing:0.05em">레이아웃 선택</div>
-
-              <!-- 템플릿 카드 -->
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="homeTemplateGrid"></div>
-
-              <!-- 추가 옵션 (좌우분할 이미지 URL) -->
               <div id="homeSplitImgWrap" style="display:none;gap:8px;align-items:center">
                 <span style="font-size:11px;color:#aaa;flex-shrink:0">이미지 URL</span>
                 <input type="text" id="homeSplitImg" placeholder="https://..." style="flex:1;border:none;border-bottom:1px solid #ccc;font-size:12px;font-family:inherit;font-weight:300;color:#3a3a3a;outline:none;padding:4px 0;background:transparent">
@@ -313,8 +306,6 @@
                 <input type="file" id="homeTopImgFile" accept="image/*" style="display:none" onchange="handleHomeTopImg(event)">
                 <span onclick="document.getElementById('homeTopImgFile').click()" style="font-size:11px;color:#aaa;cursor:pointer;flex-shrink:0">업로드</span>
               </div>
-
-              <!-- 에디터 툴바 -->
               <div class="editor-toolbar">
                 <select onchange="homeEdCmd('fontSize',this.value)">
                   <option value="1">아주 작게</option><option value="2">작게</option>
@@ -324,7 +315,7 @@
                 <div class="tb-divider"></div>
                 <select id="homeLineHeight" onchange="setHomeLineHeight(this.value)">
                   <option value="1">1배</option><option value="1.4">1.4배</option>
-                  <option value="1.6">1.6배</option><option value="1.9" selected>1.9배</option>
+                  <option value="1.6" selected>1.6배</option>
                   <option value="2.2">2.2배</option><option value="2.5">2.5배</option><option value="3">3배</option>
                 </select>
                 <div class="tb-divider"></div>
@@ -366,6 +357,9 @@
   var tiny=[], star=[], starv=[], starx=[], stary=[], tinyx=[], tinyy=[], tinyv=[];
 
   window.addEventListener('load', function() {
+    // 모바일에서는 반짝이 비활성화 (터치 이벤트 차단 방지)
+    if (window.matchMedia('(max-width: 768px)').matches) return;
+
     for (var i=0; i<sparkles; i++) {
       var rats=createDiv(3,3);
       rats.style.visibility="hidden"; rats.style.zIndex="999";
