@@ -141,12 +141,12 @@ async function loadPopup() {
 
 // ── 방문자 채팅 메모 ─────────────────────────────────────
 let chatUnsubscribe = null;
+let chatSending = false;
 
 async function loadChatMemo(container, W, H) {
   try {
     const snap = await getDoc(doc(db, 'config', 'chatMemo'));
     if (!snap.exists() || !snap.data().enabled) return;
-    if (sessionStorage.getItem('popup_closed_chatMemo')) return;
 
     const card = document.createElement('div');
     card.className = 'memo-card chat-memo';
@@ -166,7 +166,7 @@ async function loadChatMemo(container, W, H) {
       <div class="chat-input-wrap" style="pointer-events:all">
         <input type="text" id="chatTextInput" placeholder="메시지를 입력하세요"
           style="flex:1;border:none;border-top:1px solid #f0f0f0;font-size:11px;font-family:inherit;font-weight:300;outline:none;padding:6px 4px;background:transparent;color:#3a3a3a;pointer-events:all;cursor:text"
-          onkeydown="if(event.key==='Enter')submitChatMsg()">
+          onkeydown="if(event.key==='Enter'){event.preventDefault();submitChatMsg()}">
         <button onclick="submitChatMsg()"
           style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit;flex-shrink:0;padding:0 4px;pointer-events:all">전송</button>
       </div>`;
@@ -181,12 +181,16 @@ async function loadChatMemo(container, W, H) {
     chatUnsubscribe = onSnapshot(chatQ, (snap) => {
       const el = document.getElementById('chatMsgs');
       if (!el) return;
+      const isAdmin = me && me.admin;
       el.innerHTML = snap.docs.map(d => {
         const m = d.data();
-        const isMine = me && m.uid === me.uid;
-        return `<div class="chat-msg ${isMine?'is-mine':''}">
-          ${!isMine ? `<span class="chat-author">${esc(m.author||'익명')}</span>` : ''}
+        const ts = m.createdAt ? fmt(m.createdAt) : '';
+        const delBtn = isAdmin
+          ? `<button onclick="deleteChatMsg('${d.id}')" style="font-size:10px;color:#ddd;background:none;border:none;cursor:pointer;margin-left:4px;pointer-events:all">✕</button>`
+          : '';
+        return `<div class="chat-msg" style="align-items:flex-start">
           <span class="chat-text">${esc(m.text)}</span>
+          <span class="chat-time">${ts}${delBtn}</span>
         </div>`;
       }).join('');
       el.scrollTop = el.scrollHeight;
@@ -195,24 +199,32 @@ async function loadChatMemo(container, W, H) {
 }
 
 async function submitChatMsg() {
+  if (chatSending) return;
   const txtEl = document.getElementById('chatTextInput');
   const text  = txtEl?.value.trim();
   if (!text) return;
-  const author = me ? (me.nick || me.id) : '익명';
+  chatSending = true;
   try {
     await addDoc(collection(db, 'chatMessages'), {
-      author, text, uid: me?.uid || null, createdAt: serverTimestamp()
+      text, uid: me?.uid || null, createdAt: serverTimestamp()
     });
     if (txtEl) txtEl.value = '';
   } catch(e) { toast('전송 실패'); }
+  finally { chatSending = false; }
+}
+
+async function deleteChatMsg(id) {
+  try { await deleteDoc(doc(db, 'chatMessages', id)); } catch(e) {}
 }
 
 function insertPopupLink() {
-  const url = prompt('링크 URL을 입력하세요 (https://...)');
+  let url = prompt('링크 URL을 입력하세요');
   if (!url) return;
+  // http/https 없으면 자동 추가
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
   const text = prompt('링크 텍스트를 입력하세요') || url;
   document.getElementById('popupEditorArea')?.focus();
-  document.execCommand('insertHTML', false, `<a href="${esc(url)}" target="_blank" style="color:#3a3a3a;text-decoration:underline">${esc(text)}</a>`);
+  document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" style="color:#3a3a3a;text-decoration:underline">${esc(text)}</a>`);
 }
 
 async function loadPopupEditor() {
@@ -288,7 +300,6 @@ function showPopupEditForm(p) {
         <div class="tb-divider"></div>
         <button class="tb-btn" onclick="insertPopupImage()">🖼</button>
         <button class="tb-btn" onclick="insertPopupLink()" style="font-size:11px">URL</button>
-        <input type="file" id="popupImgInput" accept="image/*" style="display:none" onchange="handlePopupImgUpload(event)">
       </div>
       <div class="editor-area" id="popupEditorArea" contenteditable="true" style="min-height:120px">${p.content||''}</div>
       <div style="display:flex;justify-content:flex-end;gap:12px">
@@ -316,7 +327,7 @@ async function savePopup() {
     renderPopupList();
     // 홈 메모 카드 새로고침
     const container = document.getElementById('memoContainer');
-    if (container) { container.innerHTML = ''; sessionStorage.clear(); await loadPopup(); }
+    if (container) { container.innerHTML = ''; await loadPopup(); }
   } finally { hideLoading(); }
 }
 
@@ -338,15 +349,12 @@ function popupEdCmd(cmd) {
   document.execCommand('styleWithCSS', false, true);
   document.execCommand(cmd, false, null);
 }
-function insertPopupImage() { document.getElementById('popupImgInput')?.click(); }
-function handlePopupImgUpload(e) {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    document.getElementById('popupEditorArea')?.focus();
-    document.execCommand('insertHTML', false, `<img src="${ev.target.result}" style="max-width:100%;height:auto;display:block;margin:8px 0">`);
-  };
-  reader.readAsDataURL(file); e.target.value = '';
+function insertPopupImage() {
+  let url = prompt('이미지 URL을 입력하세요');
+  if (!url) return;
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  document.getElementById('popupEditorArea')?.focus();
+  document.execCommand('insertHTML', false, `<img src="${url}" style="max-width:100%;height:auto;display:block;margin:8px 0">`);
 }
 
 // ── 로고 패널 ────────────────────────────────────────────
@@ -947,7 +955,7 @@ async function openPost(pid) {
     if (p.secret && !isOwner(p) && sessionStorage.getItem('ulk_'+pid) !== p.secretPw) {
       show('viewLock'); hideLoading(); return;
     }
-    //await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
+    await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
     show('viewPost');
     document.getElementById('pvTitle').textContent = (p.secret?'🔒 ':'')+p.title;
     const board = boards.find(x => x.id === curBoard);
@@ -1798,8 +1806,8 @@ Object.assign(window, {
   openModal, closeModal, toReg, toLi, doLogin, doReg, doLogout,
   openMyInfo, saveMyInfo, openUserDetail, saveUserDetail, toggleAdminFromDetail, toggleAdmin, deleteUser,
   showAdminTab, renderBoardManage, moveBoardUp, moveBoardDown, deleteBoard, openAddBoard, submitAddBoard, saveHomeContent, saveBio, previewBioImg, uploadBioImg,
-  savePopup, closePopup, popupEdCmd, insertPopupImage, insertPopupLink, handlePopupImgUpload,
-  openAddPopup, editPopup, deletePopup, toggleChatMemo, submitChatMsg,
+  savePopup, closePopup, popupEdCmd, insertPopupImage, insertPopupLink,
+  openAddPopup, editPopup, deletePopup, toggleChatMemo, submitChatMsg, deleteChatMsg,
   setHomeLineHeight, homeEdCmd, insertHomeImage, insertHomeVideo, handleHomeImgUpload,
   selectHomeLayout, handleHomeSplitImg, handleHomeTopImg,
   startEditBoard, saveEditBoard, toggleAdminOnly, cycleViewMode,
