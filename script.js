@@ -34,14 +34,53 @@ function fmt(ts) {
 }
 function fmtNow() { return fmt(new Date()); }
 
-// ── 팝업 시스템 ──────────────────────────────────────────
-let popups = []; // [{ id, title, content, enabled }]
-let curPopupIdx = null; // 현재 편집 중인 팝업 인덱스
+// ── 메모 카드 시스템 ─────────────────────────────────────
+let popups = [];
+let curPopupIdx = null;
 
-function closePopup() {
-  document.getElementById('sitePopup').style.display = 'none';
-  const pid = document.getElementById('sitePopup').dataset.currentId;
-  if (pid) sessionStorage.setItem('popup_closed_' + pid, '1');
+function makeDraggable(card) {
+  let startX, startY, startLeft, startTop;
+  card.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('memo-card-close')) return;
+    e.preventDefault();
+    startX = e.clientX; startY = e.clientY;
+    startLeft = parseInt(card.style.left) || 0;
+    startTop  = parseInt(card.style.top)  || 0;
+    const onMove = e => {
+      card.style.left = (startLeft + e.clientX - startX) + 'px';
+      card.style.top  = (startTop  + e.clientY - startY) + 'px';
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  card.addEventListener('touchstart', e => {
+    if (e.target.classList.contains('memo-card-close')) return;
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY;
+    startLeft = parseInt(card.style.left) || 0;
+    startTop  = parseInt(card.style.top)  || 0;
+    const onMove = e => {
+      const t = e.touches[0];
+      card.style.left = (startLeft + t.clientX - startX) + 'px';
+      card.style.top  = (startTop  + t.clientY - startY) + 'px';
+    };
+    const onEnd = () => {
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+    };
+    document.addEventListener('touchmove', onMove, { passive: true });
+    document.addEventListener('touchend', onEnd);
+  }, { passive: true });
+}
+
+function closePopup(id) {
+  const card = document.getElementById('memo_' + id);
+  if (card) card.remove();
+  sessionStorage.setItem('popup_closed_' + id, '1');
 }
 
 async function loadPopup() {
@@ -49,14 +88,24 @@ async function loadPopup() {
     const snap = await getDoc(doc(db, 'config', 'popups'));
     if (!snap.exists()) return;
     const list = snap.data().list || [];
-    const active = list.filter(p => p.enabled && p.content);
-    // 아직 안 닫은 팝업 찾기
-    const toShow = active.find(p => !sessionStorage.getItem('popup_closed_' + p.id));
-    if (!toShow) return;
-    document.getElementById('sitePopupContent').innerHTML = toShow.content;
-    document.getElementById('sitePopup').dataset.currentId = toShow.id;
-    document.getElementById('sitePopup').style.display = 'flex';
-  } catch(e) { console.error('팝업 로드 오류:', e); }
+    const container = document.getElementById('memoContainer');
+    if (!container) return;
+    list.filter(p => p.enabled && p.content).forEach((p, i) => {
+      if (sessionStorage.getItem('popup_closed_' + p.id)) return;
+      const card = document.createElement('div');
+      card.className = 'memo-card';
+      card.id = 'memo_' + p.id;
+      card.style.left = (p.posX !== undefined ? p.posX : 20 + i * 24) + 'px';
+      card.style.top  = (p.posY !== undefined ? p.posY : 20 + i * 24) + 'px';
+      card.innerHTML = `
+        <div class="memo-card-header">
+          <button class="memo-card-close" onclick="closePopup('${p.id}')">✕</button>
+        </div>
+        <div class="memo-card-body">${p.content}</div>`;
+      makeDraggable(card);
+      container.appendChild(card);
+    });
+  } catch(e) { console.error('메모 로드 오류:', e); }
 }
 
 async function loadPopupEditor() {
@@ -97,10 +146,10 @@ function showPopupEditForm(p) {
   const el = document.getElementById('popupManageList');
   el.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
-      <input type="text" id="popupTitleInput" placeholder="팝업 제목 (관리용)" value="${esc(p.title||'')}"
+      <input type="text" id="popupTitleInput" placeholder="메모 제목 (관리용)" value="${esc(p.title||'')}"
         style="border:none;border-bottom:1px solid #ccc;font-size:13px;font-family:inherit;font-weight:300;color:#3a3a3a;outline:none;padding:5px 0;background:transparent">
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer">
-        <input type="checkbox" id="popupEnabledInput" ${p.enabled?'checked':''} accent-color="#3a3a3a"> 활성화
+        <input type="checkbox" id="popupEnabledInput" ${p.enabled?'checked':''} accent-color="#3a3a3a"> 홈에 표시
       </label>
       <div class="editor-toolbar">
         <button class="tb-btn" onclick="popupEdCmd('bold')"><b>B</b></button>
@@ -127,30 +176,33 @@ async function savePopup() {
   const content = document.getElementById('popupEditorArea')?.innerHTML.trim() || '';
   const enabled = document.getElementById('popupEnabledInput')?.checked ?? true;
   const id = curPopupIdx !== null ? popups[curPopupIdx].id : Date.now().toString();
-
   if (curPopupIdx !== null) {
-    popups[curPopupIdx] = { id, title, content, enabled };
+    popups[curPopupIdx] = { ...popups[curPopupIdx], id, title, content, enabled };
   } else {
     popups.push({ id, title, content, enabled });
   }
-
   showLoading();
   try {
     await setDoc(doc(db, 'config', 'popups'), { list: popups });
     toast('저장되었습니다.');
     curPopupIdx = null;
     renderPopupList();
+    // 홈 메모 카드 새로고침
+    const container = document.getElementById('memoContainer');
+    if (container) { container.innerHTML = ''; sessionStorage.clear(); await loadPopup(); }
   } finally { hideLoading(); }
 }
 
 async function deletePopup(i) {
-  if (!confirm('팝업을 삭제할까요?')) return;
+  if (!confirm('메모를 삭제할까요?')) return;
   popups.splice(i, 1);
   showLoading();
   try {
     await setDoc(doc(db, 'config', 'popups'), { list: popups });
     toast('삭제되었습니다.');
     renderPopupList();
+    const container = document.getElementById('memoContainer');
+    if (container) { container.innerHTML = ''; await loadPopup(); }
   } finally { hideLoading(); }
 }
 
@@ -1549,9 +1601,6 @@ function bindEvents() {
   document.getElementById('liPw').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
   // 모달 바깥 클릭
-  document.getElementById('sitePopup').addEventListener('click', e => {
-    if (e.target === document.getElementById('sitePopup')) closePopup();
-  });
   document.getElementById('overlay').addEventListener('click', e => {
     if (e.target === document.getElementById('overlay')) closeModal();
   });
