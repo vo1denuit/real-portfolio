@@ -325,8 +325,14 @@ function show(id) {
   t.classList.add('active');
 }
 
+// ── 해시 네비게이션 ──────────────────────────────────────
+function pushHash(hash) {
+  if (location.hash !== hash) history.pushState(null, '', hash || '#');
+}
+
 function goHome() {
   curBoard = null; curPost = null; show('homeArea');
+  pushHash('');
   const btn = document.getElementById('floatHomeBtn');
   if (btn) btn.style.display = 'none';
 }
@@ -336,9 +342,11 @@ function goBoard(id) {
   if (btn) btn.style.display = '';
   const b = boards.find(x => x.id === id);
   if (!b) return;
-  if (b.type === 'single') { goSingle(b); return; }
-  if (b.type === 'guest')  { goGuest(b); return; }
-  curBoard = b.id; curPost = null; editPost = null; goList(b);
+  if (b.type === 'single') { goSingle(b); pushHash('#' + id); return; }
+  if (b.type === 'guest')  { goGuest(b);  pushHash('#' + id); return; }
+  curBoard = b.id; curPost = null; editPost = null;
+  pushHash('#' + id);
+  goList(b);
 }
 
 // ── 단일 페이지 (CV형) ───────────────────────────────────
@@ -497,6 +505,7 @@ function unlockGuest(id, pw) {
 async function goList(b) {
   show('viewList');
   const board = b || boards.find(x=>x.id===curBoard);
+  if (board) pushHash('#' + board.id);
   const bName = board ? board.name : curBoard;
   const viewMode = board?.viewMode || 'list'; // list | gallery | card
   document.getElementById('listName').textContent = bName;
@@ -540,6 +549,7 @@ async function goList(b) {
         const title  = canSee ? esc(p.title) : '비밀글';
         const imgMatch = p.content ? p.content.match(/<img[^>]+src="([^"]+)"/) : null;
         const thumb = imgMatch ? imgMatch[1] : '';
+        const adminOnly = board?.adminOnly || board?.type === 'single';
         return `<div class="gallery-card" onclick="openPost('${p.id}')">
           <div class="gallery-thumb" style="${thumb ? `background-image:url('${thumb}')` : ''}">
             ${!thumb ? `<svg class="gallery-thumb-empty" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>` : ''}
@@ -547,7 +557,7 @@ async function goList(b) {
           </div>
           <div class="gallery-info">
             <div class="gallery-title">${title}</div>
-            <div class="gallery-meta">${fmt(p.createdAt)}</div>
+            ${adminOnly ? '' : `<div class="gallery-meta">${fmt(p.createdAt)}</div>`}
           </div>
         </div>`;
       };
@@ -612,6 +622,7 @@ async function goList(b) {
 // ── 글 보기 ─────────────────────────────────────────────
 async function openPost(pid) {
   curPost = pid;
+  pushHash('#' + curBoard + '/' + pid);
   showLoading();
   try {
     const snap = await getDoc(doc(db, 'boards', curBoard, 'posts', pid));
@@ -1412,7 +1423,7 @@ function bindEvents() {
 
 // 전역 등록 (동적 HTML onclick용)
 Object.assign(window, {
-  goHome, goBoard, goList, goWrite, goEdit, goAdmin, goSingle,
+  goHome, goBoard, goList, goWrite, goEdit, goAdmin, goSingle, pushHash,
   goGuest, openPost, doUnlock, submitWF, delPost,
   submitCmt, delCmt, submitGuest, deleteGuest, unlockGuest, toggleGbPw,
   startSingleEdit, saveSingleEdit, cancelSingleEdit,
@@ -1428,6 +1439,25 @@ Object.assign(window, {
   edCmd, setLineHeight, setSingleLineHeight, insertImage, insertVideo, insertFile, handleImgUpload, handleFileUpload, togglePw
 });
 
+// ── 해시 라우팅 처리 ────────────────────────────────────
+function routeFromHash() {
+  const hash = location.hash.replace('#', '');
+  if (!hash) { goHome(); return; }
+  const [boardId, postId] = hash.split('/');
+  const b = boards.find(x => x.id === boardId);
+  if (!b) { goHome(); return; }
+  if (postId) {
+    curBoard = boardId;
+    const btn = document.getElementById('floatHomeBtn');
+    if (btn) btn.style.display = '';
+    openPost(postId);
+  } else {
+    goBoard(boardId);
+  }
+}
+
+window.addEventListener('popstate', routeFromHash);
+
 // ── 초기화 ──────────────────────────────────────────────
 (async () => {
   bindEvents();
@@ -1435,5 +1465,5 @@ Object.assign(window, {
   await loadHome();
   await loadLogoBio();
   document.getElementById('floatHomeBtn').style.display = 'none';
-  goHome();
+  routeFromHash();
 })();
