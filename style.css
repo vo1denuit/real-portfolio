@@ -176,7 +176,11 @@ nav { display: flex; align-items: center; }
 .cmt-author { font-size: 12px; color: #3a3a3a; }
 .cmt-date   { font-size: 11px; color: #bbb; }
 .cmt-stag   { font-size: 10px; color: #888; }
-.cmt-del    { margin-left: auto; font-size: 11px; color: #bbb; background: none; border: none; cursor: pointer; font-family: inherit; font-weight: 300; }
+.cmt-reply-btn { margin-left: auto; font-size: 11px; color: #bbb; background: none; border: none; cursor: pointer; font-family: inherit; font-weight: 300; padding: 0; }
+.cmt-reply-btn:hover { color: #888; }
+.cmt-reply-arrow { font-size: 11px; color: #ccc; margin-right: 2px; }
+.cmt-item.is-reply { padding-left: 16px; background: #fafafa; border-left: 2px solid #f0f0f0; margin-left: 12px; }
+.reply-form { padding: 8px 12px 8px 28px; background: #fafafa; margin-bottom: 4px; }
 .cmt-del:hover { color: #c00; }
 .cmt-text   { font-size: 12px; color: #555; line-height: 1.7; }
 .cmt-form { margin-top: 16px; }
