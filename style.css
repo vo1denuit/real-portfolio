@@ -122,7 +122,7 @@ nav { display: flex; align-items: center; }
 .post-view.active { display: flex; }
 .pv-title { font-size: 15px; color: #3a3a3a; margin-bottom: 8px; line-height: 1.5; }
 .pv-meta  { font-size: 11px; color: #aaa; margin-bottom: 24px; display: flex; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid #ccc; }
-.pv-body  { font-size: 13px; line-height: 1.9; color: #444; flex: 1; padding-bottom: 24px; border-bottom: 1px solid #ccc; }
+.pv-body  { font-size: 13px; line-height: 1.6; color: #444; flex: 1; padding-bottom: 24px; border-bottom: 1px solid #ccc; overflow-y: auto; max-height: 600px; }
 .pv-body img { max-width: 100%; height: auto; display: block; margin: 8px 0; }
 .pv-body iframe { max-width: 100%; }
 .pv-actions { display: flex; gap: 16px; padding: 12px 0; border-bottom: 1px solid #ccc; }
@@ -174,7 +174,7 @@ nav { display: flex; align-items: center; }
 .tb-btn { font-size: 13px; background: none; border: 1px solid transparent; padding: 3px 7px; cursor: pointer; color: #555; font-family: inherit; border-radius: 2px; line-height: 1; transition: all 0.15s; }
 .tb-btn:hover { background: #f0f0f0; border-color: #ddd; }
 .tb-divider { width: 1px; height: 18px; background: #e0e0e0; margin: 0 4px; }
-.editor-area { min-height: 320px; border-bottom: 1px solid #ccc; padding: 12px 0; font-size: 13px; font-family: inherit; font-weight: 300; color: #3a3a3a; line-height: 1.9; outline: none; flex: 1; }
+.editor-area { min-height: 320px; max-height: 520px; overflow-y: auto; border-bottom: 1px solid #ccc; padding: 12px 0; font-size: 13px; font-family: inherit; font-weight: 300; color: #3a3a3a; line-height: 1.6; outline: none; flex: 1; }
 .editor-area:empty::before { content: '내용을 입력하세요...'; color: #ccc; pointer-events: none; }
 .editor-area:focus { border-bottom-color: #3a3a3a; }
 .editor-area img { max-width: 100%; }
@@ -403,6 +403,26 @@ nav { display: flex; align-items: center; }
 /* ── 토스트 ── */
 .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(10px); background: #3a3a3a; color: #fff; font-size: 12px; font-family: inherit; font-weight: 300; padding: 8px 20px; opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 999; }
 .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── 갤러리 그룹 ── */
+.gallery-group { margin-bottom: 40px; }
+.gallery-group-title {
+  font-size: 12px;
+  color: #aaa;
+  letter-spacing: 0.06em;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 16px;
+}
+
+/* ── 태그 표시 ── */
+.post-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.post-tag {
+  font-size: 11px;
+  color: #aaa;
+  padding: 2px 8px;
+  border: 1px solid #e8e8e8;
+}
 
 /* ── 갤러리형 ── */
 .post-gallery {
