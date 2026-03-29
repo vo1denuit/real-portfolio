@@ -90,13 +90,29 @@ async function loadPopup() {
     const list = snap.data().list || [];
     const container = document.getElementById('memoContainer');
     if (!container) return;
-    list.filter(p => p.enabled && p.content).forEach((p, i) => {
+    const W = container.offsetWidth  || 800;
+    const H = container.offsetHeight || 520;
+
+    list.filter(p => p.enabled).forEach((p, i) => {
       if (sessionStorage.getItem('popup_closed_' + p.id)) return;
+
+      // 방문자 채팅 메모 타입
+      if (p.type === 'chat') {
+        renderChatMemo(p, container, W, H, i);
+        return;
+      }
+
+      if (!p.content) return;
       const card = document.createElement('div');
       card.className = 'memo-card';
       card.id = 'memo_' + p.id;
-      card.style.left = (p.posX !== undefined ? p.posX : 20 + i * 24) + 'px';
-      card.style.top  = (p.posY !== undefined ? p.posY : 20 + i * 24) + 'px';
+
+      // 랜덤 위치 (가장자리 여백 40px)
+      const left = Math.floor(Math.random() * Math.max(W - 280, 40));
+      const top  = Math.floor(Math.random() * Math.max(H - 160, 40));
+      card.style.left = left + 'px';
+      card.style.top  = top  + 'px';
+
       card.innerHTML = `
         <div class="memo-card-header">
           <button class="memo-card-close" onclick="closePopup('${p.id}')">✕</button>
@@ -105,7 +121,75 @@ async function loadPopup() {
       makeDraggable(card);
       container.appendChild(card);
     });
+
+    // 방문자 채팅 메모 (별도 저장소)
+    await loadChatMemo(container, W, H);
   } catch(e) { console.error('메모 로드 오류:', e); }
+}
+
+// ── 방문자 채팅 메모 ─────────────────────────────────────
+async function loadChatMemo(container, W, H) {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'chatMemo'));
+    if (!snap.exists() || !snap.data().enabled) return;
+    if (sessionStorage.getItem('popup_closed_chatMemo')) return;
+
+    const msgs = snap.data().messages || [];
+    const card = document.createElement('div');
+    card.className = 'memo-card chat-memo';
+    card.id = 'memo_chatMemo';
+    const left = Math.floor(Math.random() * Math.max(W - 240, 40));
+    const top  = Math.floor(Math.random() * Math.max(H - 240, 40));
+    card.style.left = left + 'px';
+    card.style.top  = top  + 'px';
+    card.style.width = '220px';
+
+    const renderMsgs = (msgs) => msgs.slice(-20).map(m =>
+      `<div class="chat-msg"><span class="chat-author">${esc(m.author)}</span><span class="chat-text">${esc(m.text)}</span></div>`
+    ).join('');
+
+    card.innerHTML = `
+      <div class="memo-card-header">
+        <span style="font-size:11px;color:#aaa;flex:1">방명록</span>
+        <button class="memo-card-close" onclick="closePopup('chatMemo')">✕</button>
+      </div>
+      <div class="chat-messages" id="chatMsgs">${renderMsgs(msgs)}</div>
+      <div class="chat-input-wrap">
+        <input type="text" id="chatNameInput" placeholder="이름" style="width:52px;border:none;border-bottom:1px solid #eee;font-size:11px;font-family:inherit;font-weight:300;outline:none;padding:3px 0;background:transparent;color:#3a3a3a">
+        <input type="text" id="chatTextInput" placeholder="메시지" style="flex:1;border:none;border-bottom:1px solid #eee;font-size:11px;font-family:inherit;font-weight:300;outline:none;padding:3px 0;background:transparent;color:#3a3a3a" onkeydown="if(event.key==='Enter')submitChatMsg()">
+        <button onclick="submitChatMsg()" style="font-size:10px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit">→</button>
+      </div>`;
+    makeDraggable(card);
+    container.appendChild(card);
+  } catch(e) {}
+}
+
+async function submitChatMsg() {
+  const name = document.getElementById('chatNameInput')?.value.trim() || (me ? (me.nick||me.id) : '익명');
+  const text = document.getElementById('chatTextInput')?.value.trim();
+  if (!text) return;
+  try {
+    const snap = await getDoc(doc(db, 'config', 'chatMemo'));
+    const msgs = snap.exists() ? (snap.data().messages || []) : [];
+    msgs.push({ author: name, text, time: Date.now() });
+    //await updateDoc(doc(db, 'config', 'chatMemo'), { messages: msgs });
+    document.getElementById('chatTextInput').value = '';
+    // 메시지 렌더 업데이트
+    const el = document.getElementById('chatMsgs');
+    if (el) el.innerHTML = msgs.slice(-20).map(m =>
+      `<div class="chat-msg"><span class="chat-author">${esc(m.author)}</span><span class="chat-text">${esc(m.text)}</span></div>`
+    ).join('');
+    const wrap = el?.parentElement?.querySelector('.chat-messages');
+    if (wrap) wrap.scrollTop = wrap.scrollHeight;
+  } catch(e) { toast('전송 실패'); }
+}
+
+function insertPopupLink() {
+  const url = prompt('링크 URL을 입력하세요 (https://...)');
+  if (!url) return;
+  const text = prompt('링크 텍스트를 입력하세요') || url;
+  document.getElementById('popupEditorArea')?.focus();
+  document.execCommand('insertHTML', false, `<a href="${esc(url)}" target="_blank" style="color:#3a3a3a;text-decoration:underline">${esc(text)}</a>`);
 }
 
 async function loadPopupEditor() {
@@ -119,17 +203,36 @@ async function loadPopupEditor() {
 function renderPopupList() {
   const el = document.getElementById('popupManageList');
   if (!el) return;
+  let h = `<div style="padding:10px 0;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:8px">
+    <span style="font-size:12px;color:#3a3a3a;flex:1">방문자 채팅 메모</span>
+    <button onclick="toggleChatMemo()" id="chatMemoToggleBtn" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit">로딩중...</button>
+  </div>`;
   if (!popups.length) {
-    el.innerHTML = `<div style="font-size:12px;color:#ccc;padding:8px 0">팝업이 없습니다.</div>`;
-    return;
+    h += `<div style="font-size:12px;color:#ccc;padding:8px 0">메모가 없습니다.</div>`;
+  } else {
+    h += popups.map((p, i) => `
+      <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span style="font-size:12px;color:#3a3a3a;flex:1">${esc(p.title||'제목 없음')}</span>
+        <span style="font-size:11px;color:${p.enabled?'#5a9a5a':'#ccc'}">${p.enabled?'활성':'비활성'}</span>
+        <button onclick="editPopup(${i})" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit">수정</button>
+        <button onclick="deletePopup(${i})" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit">삭제</button>
+      </div>`).join('');
   }
-  el.innerHTML = popups.map((p, i) => `
-    <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <span style="font-size:12px;color:#3a3a3a;flex:1">${esc(p.title||'제목 없음')}</span>
-      <span style="font-size:11px;color:${p.enabled?'#5a9a5a':'#ccc'}">${p.enabled?'활성':'비활성'}</span>
-      <button onclick="editPopup(${i})" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit">수정</button>
-      <button onclick="deletePopup(${i})" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit">삭제</button>
-    </div>`).join('');
+  el.innerHTML = h;
+  getDoc(doc(db, 'config', 'chatMemo')).then(snap => {
+    const btn = document.getElementById('chatMemoToggleBtn');
+    if (btn) btn.textContent = (snap.exists() && snap.data().enabled) ? '활성 (끄기)' : '비활성 (켜기)';
+  }).catch(() => {});
+}
+
+async function toggleChatMemo() {
+  const snap = await getDoc(doc(db, 'config', 'chatMemo'));
+  const cur = snap.exists() ? !!snap.data().enabled : false;
+  await setDoc(doc(db, 'config', 'chatMemo'), { enabled: !cur, messages: snap.exists() ? (snap.data().messages||[]) : [] });
+  toast(!cur ? '채팅 메모가 활성화됐어요.' : '채팅 메모가 비활성화됐어요.');
+  renderPopupList();
+  const container = document.getElementById('memoContainer');
+  if (container) { container.innerHTML = ''; sessionStorage.clear(); await loadPopup(); }
 }
 
 function openAddPopup() {
@@ -161,6 +264,7 @@ function showPopupEditForm(p) {
         <button class="tb-btn" onclick="popupEdCmd('justifyRight')">≡</button>
         <div class="tb-divider"></div>
         <button class="tb-btn" onclick="insertPopupImage()">🖼</button>
+        <button class="tb-btn" onclick="insertPopupLink()" style="font-size:11px">URL</button>
         <input type="file" id="popupImgInput" accept="image/*" style="display:none" onchange="handlePopupImgUpload(event)">
       </div>
       <div class="editor-area" id="popupEditorArea" contenteditable="true" style="min-height:120px">${p.content||''}</div>
@@ -820,7 +924,7 @@ async function openPost(pid) {
     if (p.secret && !isOwner(p) && sessionStorage.getItem('ulk_'+pid) !== p.secretPw) {
       show('viewLock'); hideLoading(); return;
     }
-    //await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
+    await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
     show('viewPost');
     document.getElementById('pvTitle').textContent = (p.secret?'🔒 ':'')+p.title;
     const board = boards.find(x => x.id === curBoard);
@@ -1671,8 +1775,8 @@ Object.assign(window, {
   openModal, closeModal, toReg, toLi, doLogin, doReg, doLogout,
   openMyInfo, saveMyInfo, openUserDetail, saveUserDetail, toggleAdminFromDetail, toggleAdmin, deleteUser,
   showAdminTab, renderBoardManage, moveBoardUp, moveBoardDown, deleteBoard, openAddBoard, submitAddBoard, saveHomeContent, saveBio, previewBioImg, uploadBioImg,
-  savePopup, closePopup, popupEdCmd, insertPopupImage, handlePopupImgUpload,
-  openAddPopup, editPopup, deletePopup,
+  savePopup, closePopup, popupEdCmd, insertPopupImage, insertPopupLink, handlePopupImgUpload,
+  openAddPopup, editPopup, deletePopup, toggleChatMemo, submitChatMsg,
   setHomeLineHeight, homeEdCmd, insertHomeImage, insertHomeVideo, handleHomeImgUpload,
   selectHomeLayout, handleHomeSplitImg, handleHomeTopImg,
   startEditBoard, saveEditBoard, toggleAdminOnly, cycleViewMode,
