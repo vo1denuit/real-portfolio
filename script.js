@@ -39,14 +39,19 @@ let popups = [];
 let curPopupIdx = null;
 
 function makeDraggable(card) {
-  let startX, startY, startLeft, startTop;
-  card.addEventListener('mousedown', e => {
-    if (e.target.classList.contains('memo-card-close')) return;
+  let startX, startY, startLeft, startTop, dragging = false;
+  const header = card.querySelector('.memo-card-header');
+  const handle = header || card;
+
+  handle.addEventListener('mousedown', e => {
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) return;
     e.preventDefault();
+    dragging = false;
     startX = e.clientX; startY = e.clientY;
     startLeft = parseInt(card.style.left) || 0;
     startTop  = parseInt(card.style.top)  || 0;
     const onMove = e => {
+      dragging = true;
       card.style.left = (startLeft + e.clientX - startX) + 'px';
       card.style.top  = (startTop  + e.clientY - startY) + 'px';
     };
@@ -57,8 +62,9 @@ function makeDraggable(card) {
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
-  card.addEventListener('touchstart', e => {
-    if (e.target.classList.contains('memo-card-close')) return;
+
+  handle.addEventListener('touchstart', e => {
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) return;
     const t = e.touches[0];
     startX = t.clientX; startY = t.clientY;
     startLeft = parseInt(card.style.left) || 0;
@@ -79,16 +85,14 @@ function makeDraggable(card) {
 
 function closePopup(id) {
   const card = document.getElementById('memo_' + id);
+  // 채팅 메모는 숨기기만 (새로고침하면 다시 뜸)
+  if (id === 'chatMemo') {
+    if (card) card.style.display = 'none';
+    if (chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; }
+    return;
+  }
   if (card) card.remove();
-  // 채팅 메모는 닫아도 다음에 다시 뜨게 (세션 기록 저장 안 함)
-  if (id !== 'chatMemo') {
-    sessionStorage.setItem('popup_closed_' + id, '1');
-  }
-  // 채팅 구독 해제
-  if (id === 'chatMemo' && chatUnsubscribe) {
-    chatUnsubscribe();
-    chatUnsubscribe = null;
-  }
+  sessionStorage.setItem('popup_closed_' + id, '1');
 }
 
 async function loadPopup() {
@@ -156,15 +160,15 @@ async function loadChatMemo(container, W, H) {
     card.innerHTML = `
       <div class="memo-card-header" style="cursor:move">
         <span style="font-size:11px;color:#aaa;flex:1">채팅</span>
-        <button class="memo-card-close" onclick="closePopup('chatMemo')">✕</button>
+        <button class="memo-card-close" onclick="closePopup('chatMemo')" style="pointer-events:all">✕</button>
       </div>
-      <div class="chat-messages" id="chatMsgs"></div>
-      <div class="chat-input-wrap">
+      <div class="chat-messages" id="chatMsgs" style="pointer-events:all"></div>
+      <div class="chat-input-wrap" style="pointer-events:all">
         <input type="text" id="chatTextInput" placeholder="메시지를 입력하세요"
-          style="flex:1;border:none;border-top:1px solid #f0f0f0;font-size:11px;font-family:inherit;font-weight:300;outline:none;padding:6px 4px;background:transparent;color:#3a3a3a"
+          style="flex:1;border:none;border-top:1px solid #f0f0f0;font-size:11px;font-family:inherit;font-weight:300;outline:none;padding:6px 4px;background:transparent;color:#3a3a3a;pointer-events:all;cursor:text"
           onkeydown="if(event.key==='Enter')submitChatMsg()">
         <button onclick="submitChatMsg()"
-          style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit;flex-shrink:0;padding:0 4px">전송</button>
+          style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit;flex-shrink:0;padding:0 4px;pointer-events:all">전송</button>
       </div>`;
 
     makeDraggable(card);
@@ -943,7 +947,7 @@ async function openPost(pid) {
     if (p.secret && !isOwner(p) && sessionStorage.getItem('ulk_'+pid) !== p.secretPw) {
       show('viewLock'); hideLoading(); return;
     }
-    await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
+    //await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
     show('viewPost');
     document.getElementById('pvTitle').textContent = (p.secret?'🔒 ':'')+p.title;
     const board = boards.find(x => x.id === curBoard);
