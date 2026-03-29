@@ -98,7 +98,7 @@ nav { display: flex; align-items: center; }
 
 /* ── BOARD AREA ── */
 .board-area { margin-top: 160px; min-height: 520px; display: flex; flex-direction: column; }
-.home-area  { width: 100%; min-height: 520px; height: auto; display: flex; align-items: center; justify-content: center; color: #ccc; font-size: 13px; position: relative; }
+.home-area  { width: 100%; height: 520px; display: flex; align-items: center; justify-content: center; color: #ccc; font-size: 13px; position: relative; }
 
 /* ── 메모 카드 ── */
 .memo-card {
@@ -108,11 +108,12 @@ nav { display: flex; align-items: center; }
   padding: 20px 20px 16px;
   min-width: 180px;
   max-width: 280px;
-  pointer-events: all;
+  pointer-events: all !important;
   cursor: move;
   user-select: none;
   z-index: 10;
 }
+.memo-card * { pointer-events: all; }
 .memo-card-header {
   display: flex;
   align-items: center;
@@ -638,7 +639,7 @@ nav { display: flex; align-items: center; }
 
   /* 게시판 영역 */
   .board-area { margin-top: 60px; min-height: auto; }
-  .home-area  { height: auto; min-height: 80vh; }
+  .home-area  { height: 100vw; min-height: 480px; }
 
   /* 목록 */
   .board-inner { padding: 20px 0 32px; }
@@ -699,5 +700,5 @@ nav { display: flex; align-items: center; }
   .nav-right a, .nav-right span { font-size: 11px; }
   .logo { font-size: 12px; }
   .template-grid { grid-template-columns: repeat(2, 1fr); }
-  .home-area { height: auto; min-height: 80vh; }
+  .home-area { height: 100vw; min-height: 480px; }
 }
