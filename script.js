@@ -32,10 +32,6 @@ function fmt(ts) {
   const time = `${String(kst.getUTCHours()).padStart(2,'0')}:${String(kst.getUTCMinutes()).padStart(2,'0')}`;
   return `${date} ${time}`;
 }
-
-function fmtNow() {
-  return fmt(new Date());
-}
 function fmtNow() { return fmt(new Date()); }
 
 // ── 메모 카드 시스템 ─────────────────────────────────────
