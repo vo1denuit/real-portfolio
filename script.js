@@ -32,13 +32,6 @@ function fmt(ts) {
   const time = `${String(kst.getUTCHours()).padStart(2,'0')}:${String(kst.getUTCMinutes()).padStart(2,'0')}`;
   return `${date} ${time}`;
 }
-function fmtChat(ts) {
-  const d = ts instanceof Timestamp ? ts.toDate() : (ts ? new Date(ts) : new Date());
-  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-  const date = `${kst.getUTCFullYear()}.${String(kst.getUTCMonth()+1).padStart(2,'0')}.${String(kst.getUTCDate()).padStart(2,'0')}`;
-  const time = `${String(kst.getUTCHours()).padStart(2,'0')}:${String(kst.getUTCMinutes()).padStart(2,'0')}:${String(kst.getUTCSeconds()).padStart(2,'0')}`;
-  return `${date} ${time}`;
-}
 
 function fmtNow() {
   return fmt(new Date());
