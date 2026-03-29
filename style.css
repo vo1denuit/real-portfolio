@@ -138,6 +138,27 @@ nav { display: flex; align-items: center; }
 }
 .memo-card-body img { max-width: 100%; height: auto; }
 
+/* ── 채팅 메모 ── */
+.chat-memo { width: 220px; }
+.chat-messages {
+  max-height: 140px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.chat-msg { display: flex; flex-direction: column; gap: 1px; }
+.chat-author { font-size: 10px; color: #bbb; }
+.chat-text { font-size: 12px; color: #3a3a3a; line-height: 1.5; word-break: break-all; }
+.chat-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 6px;
+}
+
 /* ── 목록 ── */
 .board-inner { padding: 28px 0 40px; display: none; flex-direction: column; min-height: 520px; }
 .board-inner.active { display: flex; }
