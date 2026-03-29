@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, collection, query, orderBy, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, collection, query, orderBy, serverTimestamp, Timestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDOtDnbLYWV6Mb06PWv6lgA80oiXS_w02k",
@@ -80,7 +80,15 @@ function makeDraggable(card) {
 function closePopup(id) {
   const card = document.getElementById('memo_' + id);
   if (card) card.remove();
-  sessionStorage.setItem('popup_closed_' + id, '1');
+  // 채팅 메모는 닫아도 다음에 다시 뜨게 (세션 기록 저장 안 함)
+  if (id !== 'chatMemo') {
+    sessionStorage.setItem('popup_closed_' + id, '1');
+  }
+  // 채팅 구독 해제
+  if (id === 'chatMemo' && chatUnsubscribe) {
+    chatUnsubscribe();
+    chatUnsubscribe = null;
+  }
 }
 
 async function loadPopup() {
@@ -128,59 +136,70 @@ async function loadPopup() {
 }
 
 // ── 방문자 채팅 메모 ─────────────────────────────────────
+let chatUnsubscribe = null;
+
 async function loadChatMemo(container, W, H) {
   try {
     const snap = await getDoc(doc(db, 'config', 'chatMemo'));
     if (!snap.exists() || !snap.data().enabled) return;
     if (sessionStorage.getItem('popup_closed_chatMemo')) return;
 
-    const msgs = snap.data().messages || [];
     const card = document.createElement('div');
     card.className = 'memo-card chat-memo';
     card.id = 'memo_chatMemo';
     const left = Math.floor(Math.random() * Math.max(W - 240, 40));
-    const top  = Math.floor(Math.random() * Math.max(H - 240, 40));
+    const top  = Math.floor(Math.random() * Math.max(H - 200, 40));
     card.style.left = left + 'px';
     card.style.top  = top  + 'px';
     card.style.width = '220px';
 
-    const renderMsgs = (msgs) => msgs.slice(-20).map(m =>
-      `<div class="chat-msg"><span class="chat-author">${esc(m.author)}</span><span class="chat-text">${esc(m.text)}</span></div>`
-    ).join('');
-
     card.innerHTML = `
-      <div class="memo-card-header">
-        <span style="font-size:11px;color:#aaa;flex:1">방명록</span>
+      <div class="memo-card-header" style="cursor:move">
+        <span style="font-size:11px;color:#aaa;flex:1">채팅</span>
         <button class="memo-card-close" onclick="closePopup('chatMemo')">✕</button>
       </div>
-      <div class="chat-messages" id="chatMsgs">${renderMsgs(msgs)}</div>
+      <div class="chat-messages" id="chatMsgs"></div>
       <div class="chat-input-wrap">
-        <input type="text" id="chatNameInput" placeholder="이름" style="width:52px;border:none;border-bottom:1px solid #eee;font-size:11px;font-family:inherit;font-weight:300;outline:none;padding:3px 0;background:transparent;color:#3a3a3a">
-        <input type="text" id="chatTextInput" placeholder="메시지" style="flex:1;border:none;border-bottom:1px solid #eee;font-size:11px;font-family:inherit;font-weight:300;outline:none;padding:3px 0;background:transparent;color:#3a3a3a" onkeydown="if(event.key==='Enter')submitChatMsg()">
-        <button onclick="submitChatMsg()" style="font-size:10px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit">→</button>
+        <input type="text" id="chatTextInput" placeholder="메시지를 입력하세요"
+          style="flex:1;border:none;border-top:1px solid #f0f0f0;font-size:11px;font-family:inherit;font-weight:300;outline:none;padding:6px 4px;background:transparent;color:#3a3a3a"
+          onkeydown="if(event.key==='Enter')submitChatMsg()">
+        <button onclick="submitChatMsg()"
+          style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit;flex-shrink:0;padding:0 4px">전송</button>
       </div>`;
+
     makeDraggable(card);
     container.appendChild(card);
-  } catch(e) {}
+
+    // 실시간 구독
+    const chatCol = collection(db, 'chatMessages');
+    const chatQ   = query(chatCol, orderBy('createdAt', 'asc'));
+    if (chatUnsubscribe) chatUnsubscribe();
+    chatUnsubscribe = onSnapshot(chatQ, (snap) => {
+      const el = document.getElementById('chatMsgs');
+      if (!el) return;
+      el.innerHTML = snap.docs.map(d => {
+        const m = d.data();
+        const isMine = me && m.uid === me.uid;
+        return `<div class="chat-msg ${isMine?'is-mine':''}">
+          ${!isMine ? `<span class="chat-author">${esc(m.author||'익명')}</span>` : ''}
+          <span class="chat-text">${esc(m.text)}</span>
+        </div>`;
+      }).join('');
+      el.scrollTop = el.scrollHeight;
+    });
+  } catch(e) { console.error('채팅 메모 오류:', e); }
 }
 
 async function submitChatMsg() {
-  const name = document.getElementById('chatNameInput')?.value.trim() || (me ? (me.nick||me.id) : '익명');
-  const text = document.getElementById('chatTextInput')?.value.trim();
+  const txtEl = document.getElementById('chatTextInput');
+  const text  = txtEl?.value.trim();
   if (!text) return;
+  const author = me ? (me.nick || me.id) : '익명';
   try {
-    const snap = await getDoc(doc(db, 'config', 'chatMemo'));
-    const msgs = snap.exists() ? (snap.data().messages || []) : [];
-    msgs.push({ author: name, text, time: Date.now() });
-    //await updateDoc(doc(db, 'config', 'chatMemo'), { messages: msgs });
-    document.getElementById('chatTextInput').value = '';
-    // 메시지 렌더 업데이트
-    const el = document.getElementById('chatMsgs');
-    if (el) el.innerHTML = msgs.slice(-20).map(m =>
-      `<div class="chat-msg"><span class="chat-author">${esc(m.author)}</span><span class="chat-text">${esc(m.text)}</span></div>`
-    ).join('');
-    const wrap = el?.parentElement?.querySelector('.chat-messages');
-    if (wrap) wrap.scrollTop = wrap.scrollHeight;
+    await addDoc(collection(db, 'chatMessages'), {
+      author, text, uid: me?.uid || null, createdAt: serverTimestamp()
+    });
+    if (txtEl) txtEl.value = '';
   } catch(e) { toast('전송 실패'); }
 }
 
