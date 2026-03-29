@@ -28,7 +28,9 @@ function hideLoading() { document.getElementById('loadingOverlay').style.display
 function fmt(ts) {
   const d = ts instanceof Timestamp ? ts.toDate() : (ts ? new Date(ts) : new Date());
   const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-  return `${kst.getUTCFullYear()}.${String(kst.getUTCMonth()+1).padStart(2,'0')}.${String(kst.getUTCDate()).padStart(2,'0')}`;
+  const date = `${kst.getUTCFullYear()}.${String(kst.getUTCMonth()+1).padStart(2,'0')}.${String(kst.getUTCDate()).padStart(2,'0')}`;
+  const time = `${String(kst.getUTCHours()).padStart(2,'0')}:${String(kst.getUTCMinutes()).padStart(2,'0')}`;
+  return `${date} ${time}`;
 }
 function fmtNow() { return fmt(new Date()); }
 
@@ -206,7 +208,7 @@ async function loadHome() {
   if (!snap.exists() || !snap.data().content) { el.innerHTML = ''; return; }
   const { content, lineHeight, layout, imgUrl } = snap.data();
   const tmpl = HOME_LAYOUTS.find(t => t.id === (layout||'free')) || HOME_LAYOUTS[0];
-  el.innerHTML = tmpl.render(content, lineHeight||'1.9', imgUrl||'');
+  el.innerHTML = tmpl.render(content, lineHeight||'1.6', imgUrl||'');
   el.style.cssText = 'width:100%;height:100%';
 }
 
@@ -219,10 +221,10 @@ async function loadHomeEditor() {
       const area = document.getElementById('homeEditorArea');
       if (area) {
         area.innerHTML          = content || '';
-        area.style.lineHeight   = lineHeight || '1.9';
-        area.dataset.lineHeight = lineHeight || '1.9';
+        area.style.lineHeight   = lineHeight || '1.6';
+        area.dataset.lineHeight = lineHeight || '1.6';
         const sel = document.getElementById('homeLineHeight');
-        if (sel) sel.value = lineHeight || '1.9';
+        if (sel) sel.value = lineHeight || '1.6';
       }
       if (imgUrl) {
         document.getElementById('homeSplitImg').value = imgUrl;
@@ -248,6 +250,7 @@ async function loadHomeEditor() {
 function homeEdCmd(cmd, val) {
   const area = document.getElementById('homeEditorArea');
   if (area) area.focus();
+  document.execCommand('styleWithCSS', false, true);
   document.execCommand(cmd, false, val||null);
 }
 function setHomeLineHeight(val) {
@@ -280,7 +283,7 @@ function insertHomeVideo() {
 async function saveHomeContent() {
   const area       = document.getElementById('homeEditorArea');
   const content    = area.innerHTML.trim();
-  const lineHeight = area.dataset.lineHeight || '1.9';
+  const lineHeight = area.dataset.lineHeight || '1.6';
   const imgUrl     = curHomeLayout === 'split'  ? document.getElementById('homeSplitImg').value
                    : curHomeLayout === 'topimg' ? document.getElementById('homeTopImg').value : '';
   showLoading();
@@ -358,7 +361,7 @@ async function goSingle(b) {
 
 function startSingleEdit() {
   const content    = document.getElementById('singleBody').innerHTML;
-  const lineHeight = document.getElementById('singleBody').style.lineHeight || '1.9';
+  const lineHeight = document.getElementById('singleBody').style.lineHeight || '1.6';
   document.getElementById('singleDisplay').style.display = 'none';
   document.getElementById('singleEditor').style.display  = 'flex';
   const area = document.getElementById('singleEditorArea');
@@ -374,7 +377,7 @@ function startSingleEdit() {
 async function saveSingleEdit() {
   const area    = document.getElementById('singleEditorArea');
   const content    = area.innerHTML.trim();
-  const lineHeight = area.dataset.lineHeight || '1.9';
+  const lineHeight = area.dataset.lineHeight || '1.6';
   showLoading();
   try {
     await setDoc(doc(db, 'config', 'single_' + curSingleBoard.id), { content, lineHeight });
@@ -391,7 +394,11 @@ function cancelSingleEdit() {
   document.getElementById('singleEditor').style.display  = 'none';
 }
 
-function edCmdSingle(cmd, val) { document.getElementById('singleEditorArea').focus(); document.execCommand(cmd, false, val||null); }
+function edCmdSingle(cmd, val) {
+  document.getElementById('singleEditorArea').focus();
+  document.execCommand('styleWithCSS', false, true);
+  document.execCommand(cmd, false, val||null);
+}
 function insertSingleImage() { document.getElementById('singleImgInput').click(); }
 function handleSingleImgUpload(e) {
   const file = e.target.files[0]; if (!file) return;
@@ -511,25 +518,52 @@ async function goList(b) {
       h = `<div class="empty">아직 글이 없습니다.</div>`;
 
     } else if (viewMode === 'gallery') {
-      h = `<div class="post-gallery">`;
-      snap.forEach(d => {
-        const p = { id: d.id, ...d.data() };
+      // 전체 글 수집
+      const posts = [];
+      snap.forEach(d => posts.push({ id: d.id, ...d.data() }));
+
+      // 태그 순서 (board에 저장된 tagOrder 또는 자동 추출)
+      const tagOrder = board?.tagOrder || [];
+      const allTags  = new Set();
+      posts.forEach(p => (p.tags||[]).forEach(t => allTags.add(t)));
+      // tagOrder에 없는 태그는 뒤에 추가
+      const orderedTags = [
+        ...tagOrder.filter(t => allTags.has(t)),
+        ...[...allTags].filter(t => !tagOrder.includes(t))
+      ];
+      // 태그 없는 글도 표시 (기타)
+      const noTagPosts = posts.filter(p => !p.tags || p.tags.length === 0);
+      if (noTagPosts.length) orderedTags.push('__none__');
+
+      const renderCard = (p) => {
         const canSee = !p.secret || isOwner(p) || sessionStorage.getItem('ulk_'+p.id) === p.secretPw;
         const title  = canSee ? esc(p.title) : '비밀글';
         const imgMatch = p.content ? p.content.match(/<img[^>]+src="([^"]+)"/) : null;
         const thumb = imgMatch ? imgMatch[1] : '';
-        h += `<div class="gallery-card" onclick="openPost('${p.id}')">
+        return `<div class="gallery-card" onclick="openPost('${p.id}')">
           <div class="gallery-thumb" style="${thumb ? `background-image:url('${thumb}')` : ''}">
             ${!thumb ? `<svg class="gallery-thumb-empty" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>` : ''}
             ${p.secret ? '<span class="gallery-lock">🔒</span>' : ''}
           </div>
           <div class="gallery-info">
             <div class="gallery-title">${title}</div>
-            <div class="gallery-meta">${esc(p.author)} · ${fmt(p.createdAt)}</div>
+            <div class="gallery-meta">${fmt(p.createdAt)}</div>
           </div>
         </div>`;
+      };
+
+      h = '';
+      orderedTags.forEach(tag => {
+        const tagPosts = tag === '__none__'
+          ? noTagPosts
+          : posts.filter(p => (p.tags||[]).includes(tag));
+        if (!tagPosts.length) return;
+        const tagLabel = tag === '__none__' ? '기타' : esc(tag);
+        h += `<div class="gallery-group">
+          <div class="gallery-group-title">${tagLabel}</div>
+          <div class="post-gallery">${tagPosts.map(renderCard).join('')}</div>
+        </div>`;
       });
-      h += `</div>`;
 
     } else if (viewMode === 'card') {
       // ── 카드형 ──
@@ -586,7 +620,7 @@ async function openPost(pid) {
     if (p.secret && !isOwner(p) && sessionStorage.getItem('ulk_'+pid) !== p.secretPw) {
       show('viewLock'); hideLoading(); return;
     }
-    //await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
+    await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
     show('viewPost');
     document.getElementById('pvTitle').textContent = (p.secret?'🔒 ':'')+p.title;
     const board = boards.find(x => x.id === curBoard);
@@ -596,7 +630,12 @@ async function openPost(pid) {
       <span>${fmt(p.createdAt)}</span>
       <span>조회 ${(p.views||0)+1}</span>`;
     document.getElementById('pvBody').innerHTML = p.content || '';
-    document.getElementById('pvBody').style.lineHeight = p.lineHeight || '1.9';
+    document.getElementById('pvBody').style.lineHeight = p.lineHeight || '1.6';
+    // 태그 표시
+    const tagsHtml = (p.tags||[]).length
+      ? `<div class="post-tags">${p.tags.map(t=>`<span class="post-tag">${esc(t)}</span>`).join('')}</div>`
+      : '';
+    document.getElementById('pvBody').insertAdjacentHTML('afterend', tagsHtml);
     let acts = `<button onclick="goList()">목록</button>`;
     if (isOwner(p)) {
       acts += `<button onclick="goEdit('${pid}')">수정</button>`;
@@ -681,7 +720,7 @@ function renderWF(p) {
   const nf = !me ? `<div class="wf-row"><span class="wf-label">이름</span><input class="wf-input" id="wfA" value="${p?esc(p.author):''}"></div>` : '';
   const sc = p && p.secret ? 'checked' : '';
   const pv = p && p.secretPw ? esc(p.secretPw) : '';
-  const lh = p && p.lineHeight ? p.lineHeight : '1.9';
+  const lh = p && p.lineHeight ? p.lineHeight : '1.6';
   document.getElementById('writeBody').innerHTML = `
     ${nf}
     <div class="wf-row"><span class="wf-label">제목</span><input class="wf-input" id="wfT" value="${p?esc(p.title):''}"></div>
@@ -724,6 +763,10 @@ function renderWF(p) {
         <span>비밀번호</span><input type="password" id="wfPw" value="${pv}">
       </div>
     </div>
+    <div class="wf-row" style="margin-top:8px">
+      <span class="wf-label" style="color:#bbb;font-size:11px">태그</span>
+      <input class="wf-input" id="wfTags" placeholder="디자인, 개발, 일러스트 (쉼표로 구분)" value="${p&&p.tags ? esc(p.tags.join(', ')) : ''}">
+    </div>
     <div class="wf-submit-row">
       <button onclick="goList()">취소</button>
       <button class="btn-ok" onclick="submitWF()">${editPost?'수정':'등록'}</button>
@@ -747,7 +790,12 @@ function setSingleLineHeight(val) {
   area.style.lineHeight = val;
   area.dataset.lineHeight = val;
 }
-function edCmd(cmd, val) { document.getElementById('edArea').focus(); document.execCommand(cmd, false, val||null); }
+function edCmd(cmd, val) {
+  const area = document.getElementById('edArea');
+  if (area) area.focus();
+  document.execCommand('styleWithCSS', false, true);
+  document.execCommand(cmd, false, val||null);
+}
 function insertImage() { document.getElementById('edImgInput').click(); }
 function handleImgUpload(e) {
   const file = e.target.files[0]; if (!file) return;
@@ -786,9 +834,11 @@ async function submitWF() {
   }
   const title      = document.getElementById('wfT').value.trim();
   const content    = document.getElementById('edArea').innerHTML.trim();
-  const lineHeight = document.getElementById('edArea').dataset.lineHeight || '1.9';
+  const lineHeight = document.getElementById('edArea').dataset.lineHeight || '1.6';
   const isSec      = document.getElementById('wfSec').checked;
   const sPw        = document.getElementById('wfPw')?.value || '';
+  const tagsRaw    = document.getElementById('wfTags')?.value || '';
+  const tags       = tagsRaw.split(',').map(t=>t.trim()).filter(Boolean);
   if (!title)        { toast('제목을 입력해주세요.'); return; }
   if (!content || content==='<br>') { toast('내용을 입력해주세요.'); return; }
   if (isSec && !sPw) { toast('비밀번호를 입력해주세요.'); return; }
@@ -796,11 +846,11 @@ async function submitWF() {
   showLoading();
   try {
     if (editPost) {
-      await updateDoc(doc(db,'boards',curBoard,'posts',editPost.id), { title, content, lineHeight, secret:isSec, secretPw:isSec?sPw:'' });
+      await updateDoc(doc(db,'boards',curBoard,'posts',editPost.id), { title, content, lineHeight, tags, secret:isSec, secretPw:isSec?sPw:'' });
       toast('수정되었습니다.'); curPost = editPost.id; editPost = null; openPost(curPost);
     } else {
       await addDoc(collection(db,'boards',curBoard,'posts'), {
-        title, content, lineHeight, author, secret:isSec, secretPw:isSec?sPw:'',
+        title, content, lineHeight, tags, author, secret:isSec, secretPw:isSec?sPw:'',
         uid: me?me.uid:null, views:0, createdAt: serverTimestamp()
       });
       toast('등록되었습니다.'); goList();
@@ -998,6 +1048,7 @@ async function renderBoardManage() {
       <span class="admin-actions">
         <button onclick="startEditBoard(${i})">수정</button>
         ${b.type !== 'guest' && b.type !== 'single' ? `<button onclick="cycleViewMode(${i})">${modeLabel}</button>` : ''}
+        ${b.viewMode === 'gallery' ? `<button onclick="openTagOrder(${i})">태그순서</button>` : ''}
         <button onclick="toggleAdminOnly(${i})">${b.adminOnly ? '전체공개' : '관리자전용'}</button>
         ${i > 0 ? `<button onclick="moveBoardUp(${i})">↑</button>` : ''}
         ${i < boards.length-1 ? `<button onclick="moveBoardDown(${i})">↓</button>` : ''}
@@ -1079,6 +1130,80 @@ async function cycleViewMode(i) {
   await saveBoards();
   renderBoardManage();
   toast(`"${boards[i].name}" 게시판이 ${({list:'목록형',gallery:'갤러리형',card:'카드형'})[boards[i].viewMode]}으로 변경됐어요.`);
+}
+
+async function openTagOrder(i) {
+  const b = boards[i];
+  // 해당 게시판의 모든 태그 수집
+  showLoading();
+  try {
+    const snap = await getDocs(collection(db, 'boards', b.id, 'posts'));
+    const allTags = new Set();
+    snap.forEach(d => (d.data().tags||[]).forEach(t => allTags.add(t)));
+    if (!allTags.size) { toast('아직 태그가 없어요.'); return; }
+
+    const tagOrder = b.tagOrder || [...allTags];
+    const ordered  = [...tagOrder.filter(t=>allTags.has(t)), ...[...allTags].filter(t=>!tagOrder.includes(t))];
+
+    // 인라인 편집 UI
+    const row = document.getElementById('boardRow_' + i);
+    let tagHtml = `<div style="padding:12px 0;display:flex;flex-direction:column;gap:6px" id="tagOrderWrap_${i}">
+      <div style="font-size:11px;color:#aaa;margin-bottom:4px">태그 순서 (드래그하여 순서 변경)</div>
+      <div id="tagList_${i}" style="display:flex;flex-direction:column;gap:4px">`;
+    ordered.forEach((tag, ti) => {
+      tagHtml += `<div class="tag-order-item" data-tag="${esc(tag)}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#f9f9f9;cursor:move">
+        <span style="font-size:11px;color:#aaa;width:16px">${ti+1}</span>
+        <span style="font-size:12px;color:#3a3a3a;flex:1">${esc(tag)}</span>
+        ${ti > 0 ? `<button onclick="moveTagUp(${i},${ti})" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer">↑</button>` : '<span style="width:20px"></span>'}
+        ${ti < ordered.length-1 ? `<button onclick="moveTagDown(${i},${ti})" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer">↓</button>` : '<span style="width:20px"></span>'}
+      </div>`;
+    });
+    tagHtml += `</div>
+      <div style="display:flex;gap:12px;margin-top:6px">
+        <button onclick="saveTagOrder(${i})" style="font-size:11px;color:#3a3a3a;background:none;border:none;cursor:pointer;font-family:inherit">저장</button>
+        <button onclick="renderBoardManage()" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit">취소</button>
+      </div>
+    </div>`;
+
+    row.insertAdjacentHTML('afterend', tagHtml);
+    // 임시 저장용
+    row.dataset.tagOrderIdx = i;
+  } finally { hideLoading(); }
+}
+
+function moveTagUp(boardIdx, tagIdx) {
+  const wrap = document.getElementById('tagList_' + boardIdx);
+  const items = [...wrap.querySelectorAll('.tag-order-item')];
+  if (tagIdx === 0) return;
+  wrap.insertBefore(items[tagIdx], items[tagIdx-1]);
+  refreshTagNumbers(boardIdx);
+}
+
+function moveTagDown(boardIdx, tagIdx) {
+  const wrap = document.getElementById('tagList_' + boardIdx);
+  const items = [...wrap.querySelectorAll('.tag-order-item')];
+  if (tagIdx >= items.length-1) return;
+  wrap.insertBefore(items[tagIdx+1], items[tagIdx]);
+  refreshTagNumbers(boardIdx);
+}
+
+function refreshTagNumbers(boardIdx) {
+  const items = document.querySelectorAll(`#tagList_${boardIdx} .tag-order-item`);
+  items.forEach((item, i) => {
+    item.querySelector('span:first-child').textContent = i+1;
+    const btns = item.querySelectorAll('button');
+    if (btns[0]) btns[0].setAttribute('onclick', `moveTagUp(${boardIdx},${i})`);
+    if (btns[1]) btns[1].setAttribute('onclick', `moveTagDown(${boardIdx},${i})`);
+  });
+}
+
+async function saveTagOrder(boardIdx) {
+  const items = document.querySelectorAll(`#tagList_${boardIdx} .tag-order-item`);
+  const tagOrder = [...items].map(el => el.dataset.tag);
+  boards[boardIdx].tagOrder = tagOrder;
+  await saveBoards();
+  toast('태그 순서가 저장됐어요.');
+  renderBoardManage();
 }
 
 async function toggleAdminOnly(i) {
@@ -1298,6 +1423,7 @@ Object.assign(window, {
   setHomeLineHeight, homeEdCmd, insertHomeImage, insertHomeVideo, handleHomeImgUpload,
   selectHomeLayout, handleHomeSplitImg, handleHomeTopImg,
   startEditBoard, saveEditBoard, toggleAdminOnly, cycleViewMode,
+  openTagOrder, moveTagUp, moveTagDown, saveTagOrder,
   loadAdminPosts, adminDelPost, adminEditPost,
   edCmd, setLineHeight, setSingleLineHeight, insertImage, insertVideo, insertFile, handleImgUpload, handleFileUpload, togglePw
 });
