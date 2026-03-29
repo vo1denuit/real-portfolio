@@ -139,24 +139,42 @@ nav { display: flex; align-items: center; }
 .memo-card-body img { max-width: 100%; height: auto; }
 
 /* ── 채팅 메모 ── */
-.chat-memo { width: 220px; }
+.chat-memo { width: 220px; padding: 0; overflow: hidden; }
+.chat-memo .memo-card-header { padding: 10px 14px 8px; border-bottom: 1px solid #f0f0f0; cursor: move; }
 .chat-messages {
-  max-height: 140px;
+  height: 160px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fafafa;
 }
-.chat-msg { display: flex; flex-direction: column; gap: 1px; }
+.chat-msg { display: flex; flex-direction: column; gap: 2px; max-width: 100%; }
+.chat-msg.is-mine { align-items: flex-end; }
 .chat-author { font-size: 10px; color: #bbb; }
-.chat-text { font-size: 12px; color: #3a3a3a; line-height: 1.5; word-break: break-all; }
+.chat-text {
+  font-size: 12px;
+  color: #3a3a3a;
+  line-height: 1.5;
+  word-break: break-all;
+  background: #fff;
+  border: 1px solid #eee;
+  padding: 4px 8px;
+  display: inline-block;
+  max-width: 90%;
+}
+.chat-msg.is-mine .chat-text {
+  background: #3a3a3a;
+  color: #fff;
+  border-color: #3a3a3a;
+}
 .chat-input-wrap {
   display: flex;
   align-items: center;
-  gap: 4px;
+  padding: 0 8px 0 14px;
   border-top: 1px solid #f0f0f0;
-  padding-top: 6px;
+  background: #fff;
 }
 
 /* ── 목록 ── */
