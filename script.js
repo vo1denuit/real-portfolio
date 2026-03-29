@@ -631,7 +631,7 @@ async function openPost(pid) {
     if (p.secret && !isOwner(p) && sessionStorage.getItem('ulk_'+pid) !== p.secretPw) {
       show('viewLock'); hideLoading(); return;
     }
-    await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
+    //await updateDoc(doc(db, 'boards', curBoard, 'posts', pid), { views: (p.views||0)+1 });
     show('viewPost');
     document.getElementById('pvTitle').textContent = (p.secret?'🔒 ':'')+p.title;
     const board = boards.find(x => x.id === curBoard);
