@@ -139,36 +139,75 @@ nav { display: flex; align-items: center; }
 .chat-memo .memo-card-body { pointer-events: all; }
 
 /* ── 채팅 메모 ── */
-.chat-memo { width: 220px; padding: 0; overflow: hidden; }
-.chat-memo .memo-card-header { padding: 10px 14px 8px; border-bottom: 1px solid #f0f0f0; cursor: move; }
+.chat-memo {
+  width: 260px;
+  padding: 0;
+  overflow: hidden;
+}
+.chat-memo .memo-card-header {
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: move;
+}
 .chat-messages {
-  height: 160px;
+  max-height: 180px;
   overflow-y: auto;
+  padding: 8px 10px 6px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 14px;
-  background: #fafafa;
+  gap: 10px;
+  text-align: left;
+  background: #fff;
   pointer-events: all;
 }
-.chat-msg { display: flex; flex-direction: column; gap: 2px; max-width: 100%; }
-.chat-msg.is-mine { align-items: flex-end; }
-.chat-author { font-size: 10px; color: #bbb; }
+.chat-line {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+.chat-line-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.chat-author {
+  font-size: 10px;
+  color: #888;
+}
+.chat-time {
+  font-size: 10px;
+  color: #bbb;
+}
 .chat-text {
   font-size: 12px;
   color: #3a3a3a;
   line-height: 1.5;
-  word-break: break-all;
-  background: #fff;
-  border: 1px solid #eee;
-  padding: 4px 8px;
-  display: inline-block;
-  max-width: 90%;
+  white-space: normal;
+  word-break: break-word;
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  text-align: left;
+  max-width: 100%;
 }
-.chat-msg.is-mine .chat-text {
-  background: #3a3a3a;
-  color: #fff;
-  border-color: #3a3a3a;
+.chat-del-btn {
+  margin-left: auto;
+  font-size: 10px;
+  color: #bbb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+.chat-del-btn:hover {
+  color: #666;
 }
 .chat-input-wrap {
   display: flex;
@@ -181,7 +220,6 @@ nav { display: flex; align-items: center; }
 .chat-input-wrap input,
 .chat-input-wrap button {
   pointer-events: all;
-  cursor: text;
 }
 
 /* ── 목록 ── */
