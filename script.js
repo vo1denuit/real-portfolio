@@ -118,6 +118,7 @@ async function loadPopup() {
       const card = document.createElement('div');
       card.className = 'memo-card';
       card.id = 'memo_' + p.id;
+      card.style.pointerEvents = 'all';
 
       // 랜덤 위치 (가장자리 여백 40px)
       const left = Math.floor(Math.random() * Math.max(W - 280, 40));
@@ -151,6 +152,7 @@ async function loadChatMemo(container, W, H) {
     const card = document.createElement('div');
     card.className = 'memo-card chat-memo';
     card.id = 'memo_chatMemo';
+    card.style.pointerEvents = 'all';
     const left = Math.floor(Math.random() * Math.max(W - 240, 40));
     const top  = Math.floor(Math.random() * Math.max(H - 200, 40));
     card.style.left = left + 'px';
