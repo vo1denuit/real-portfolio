@@ -134,9 +134,9 @@ nav { display: flex; align-items: center; }
   font-size: 12px;
   color: #555;
   line-height: 1.7;
-  pointer-events: none;
 }
 .memo-card-body img { max-width: 100%; height: auto; }
+.chat-memo .memo-card-body { pointer-events: all; }
 
 /* ── 채팅 메모 ── */
 .chat-memo { width: 220px; padding: 0; overflow: hidden; }
@@ -149,6 +149,7 @@ nav { display: flex; align-items: center; }
   gap: 8px;
   padding: 10px 14px;
   background: #fafafa;
+  pointer-events: all;
 }
 .chat-msg { display: flex; flex-direction: column; gap: 2px; max-width: 100%; }
 .chat-msg.is-mine { align-items: flex-end; }
@@ -175,6 +176,12 @@ nav { display: flex; align-items: center; }
   padding: 0 8px 0 14px;
   border-top: 1px solid #f0f0f0;
   background: #fff;
+  pointer-events: all;
+}
+.chat-input-wrap input,
+.chat-input-wrap button {
+  pointer-events: all;
+  cursor: text;
 }
 
 /* ── 목록 ── */
