@@ -642,11 +642,16 @@ async function openPost(pid) {
       <span>조회 ${(p.views||0)+1}</span>`;
     document.getElementById('pvBody').innerHTML = p.content || '';
     document.getElementById('pvBody').style.lineHeight = p.lineHeight || '1.6';
-    // 태그 표시
-    const tagsHtml = (p.tags||[]).length
-      ? `<div class="post-tags">${p.tags.map(t=>`<span class="post-tag">${esc(t)}</span>`).join('')}</div>`
-      : '';
-    document.getElementById('pvBody').insertAdjacentHTML('afterend', tagsHtml);
+    // 기존 태그 제거 후 새로 추가
+    const oldTags = document.getElementById('pvTagsWrap');
+    if (oldTags) oldTags.remove();
+    if ((p.tags||[]).length) {
+      const tagsEl = document.createElement('div');
+      tagsEl.id = 'pvTagsWrap';
+      tagsEl.className = 'post-tags';
+      tagsEl.innerHTML = p.tags.map(t=>`<span class="post-tag">${esc(t)}</span>`).join('');
+      document.getElementById('pvBody').insertAdjacentElement('afterend', tagsEl);
+    }
     let acts = `<button onclick="goList()">목록</button>`;
     if (isOwner(p)) {
       acts += `<button onclick="goEdit('${pid}')">수정</button>`;
