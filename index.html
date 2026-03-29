@@ -290,8 +290,14 @@
               </div>
             </div>
 
-            <!-- 홈 화면 편집 -->
-            <div style="display:flex;flex-direction:column;flex:1;gap:16px">
+            <!-- 팝업 관리 -->
+            <div style="padding-bottom:20px;border-bottom:1px solid #eee">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div style="font-size:11px;color:#aaa;letter-spacing:0.05em">팝업 관리</div>
+                <button onclick="openAddPopup()" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300">+ 팝업 추가</button>
+              </div>
+              <div id="popupManageList"></div>
+            </div>
               <div style="font-size:11px;color:#aaa;letter-spacing:0.05em">레이아웃 선택</div>
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="homeTemplateGrid"></div>
               <div id="homeSplitImgWrap" style="display:none;gap:8px;align-items:center">
@@ -343,6 +349,14 @@
       </div><!-- /board-area -->
     </div><!-- /card -->
   </div><!-- /wrap -->
+
+  <!-- ── 팝업 ── -->
+  <div id="sitePopup" style="display:none;position:fixed;inset:0;z-index:80;background:rgba(0,0,0,0.08);align-items:center;justify-content:center">
+    <div id="sitePopupBox" style="background:#fff;width:480px;max-width:calc(100vw - 40px);max-height:80vh;overflow-y:auto;padding:36px 40px 32px;position:relative">
+      <button onclick="closePopup()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:15px;color:#bbb;cursor:pointer;font-family:inherit;line-height:1">✕</button>
+      <div id="sitePopupContent" style="font-size:13px;color:#3a3a3a;line-height:1.8"></div>
+    </div>
+  </div>
 
   <!-- 홈 버튼 -->
   <div id="floatHomeBtn" onclick="goHome()" style="position:fixed;bottom:32px;right:48px;cursor:pointer;font-size:14px;color:#aaa;font-family:inherit;font-weight:300;opacity:0.5;transition:opacity 0.2s;z-index:50;user-select:none;display:none;letter-spacing:0.05em" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">home</div>
