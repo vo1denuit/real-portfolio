@@ -854,36 +854,82 @@ async function openPost(pid) {
 async function renderCmts(pid) {
   const q = query(collection(db, 'boards', curBoard, 'posts', pid, 'comments'), orderBy('createdAt', 'asc'));
   const snap = await getDocs(q);
-  let h = `<div class="cmt-label">댓글 ${snap.size}</div>`;
-  snap.forEach(d => {
-    const c = { id: d.id, ...d.data() };
+  const all = [];
+  snap.forEach(d => all.push({ id: d.id, ...d.data() }));
+
+  // 부모 댓글 / 대댓글 분리
+  const parents  = all.filter(c => !c.parentId);
+  const children = all.filter(c => !!c.parentId);
+
+  let h = `<div class="cmt-label">댓글 ${all.length}</div>`;
+
+  const renderCmt = (c, isReply = false) => {
     const canSee = !c.secret || (me && (me.uid===c.uid||me.admin));
     const text   = canSee ? esc(c.text).replace(/\n/g,'<br>') : '비밀댓글입니다.';
     const tag    = c.secret ? '<span class="cmt-stag">비밀</span>' : '';
     const del    = (me && (me.uid===c.uid||me.admin)) ? `<button class="cmt-del" onclick="delCmt('${c.id}')">삭제</button>` : '';
-    h += `<div class="cmt-item${c.secret?' is-secret':''}">
-      <div class="cmt-meta"><span class="cmt-author">${esc(c.author)}</span><span class="cmt-date">${fmt(c.createdAt)}</span>${tag}${del}</div>
+    const replyBtn = !isReply ? `<button class="cmt-reply-btn" onclick="toggleReplyForm('${c.id}')">답글</button>` : '';
+    return `<div class="cmt-item${c.secret?' is-secret':''}${isReply?' is-reply':''}">
+      <div class="cmt-meta">
+        ${isReply ? '<span class="cmt-reply-arrow">↳</span>' : ''}
+        <span class="cmt-author">${esc(c.author)}</span>
+        <span class="cmt-date">${fmt(c.createdAt)}</span>
+        ${tag}${replyBtn}${del}
+      </div>
       <div class="cmt-text">${text}</div>
     </div>`;
+  };
+
+  parents.forEach(c => {
+    h += renderCmt(c, false);
+    // 답글 폼 자리
+    h += `<div id="replyForm_${c.id}" style="display:none"></div>`;
+    // 대댓글들
+    const replies = children.filter(r => r.parentId === c.id);
+    replies.forEach(r => { h += renderCmt(r, true); });
   });
+
   const nameF = !me ? `<input type="text" id="cmtName" placeholder="이름">` : '';
   h += `<div class="cmt-form">
     <div class="cmt-inputs">${nameF}<label class="cmt-secret-label"><input type="checkbox" id="cmtSec"> 비밀댓글</label></div>
     <textarea class="cmt-textarea" id="cmtTxt" placeholder="댓글을 남겨주세요" rows="2"></textarea>
-    <div class="cmt-submit-row"><button onclick="submitCmt()">등록</button></div>
+    <div class="cmt-submit-row"><button onclick="submitCmt(null)">등록</button></div>
   </div>`;
   document.getElementById('pvComments').innerHTML = h;
 }
 
-async function submitCmt() {
-  const text = document.getElementById('cmtTxt').value.trim();
-  if (!text) { toast('댓글을 입력해주세요.'); return; }
-  const isSec  = document.getElementById('cmtSec').checked;
-  const author = me ? (me.nick || me.id) : (document.getElementById('cmtName')?.value.trim()||'익명');
+function toggleReplyForm(parentId) {
+  const wrap = document.getElementById('replyForm_' + parentId);
+  if (!wrap) return;
+  if (wrap.style.display !== 'none') { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+  const nameF = !me ? `<input type="text" id="replyName_${parentId}" placeholder="이름" style="border:none;border-bottom:1px solid #ccc;background:transparent;font-size:12px;font-family:inherit;font-weight:300;color:#3a3a3a;outline:none;padding:4px 0;width:80px">` : '';
+  wrap.innerHTML = `<div class="reply-form">
+    <div class="cmt-inputs">${nameF}<label class="cmt-secret-label"><input type="checkbox" id="replySec_${parentId}"> 비밀</label></div>
+    <textarea class="cmt-textarea" id="replyTxt_${parentId}" placeholder="답글을 남겨주세요" rows="2"></textarea>
+    <div class="cmt-submit-row">
+      <button onclick="toggleReplyForm('${parentId}')" style="font-size:12px;color:#bbb;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:300;margin-right:8px">취소</button>
+      <button onclick="submitCmt('${parentId}')">등록</button>
+    </div>
+  </div>`;
+  wrap.style.display = 'block';
+  document.getElementById('replyTxt_' + parentId)?.focus();
+}
+
+async function submitCmt(parentId) {
+  const isReply  = !!parentId;
+  const txtEl    = document.getElementById(isReply ? 'replyTxt_'+parentId : 'cmtTxt');
+  const secEl    = document.getElementById(isReply ? 'replySec_'+parentId : 'cmtSec');
+  const nameEl   = document.getElementById(isReply ? 'replyName_'+parentId : 'cmtName');
+  const text     = txtEl?.value.trim();
+  if (!text) { toast('내용을 입력해주세요.'); return; }
+  const isSec  = secEl?.checked || false;
+  const author = me ? (me.nick || me.id) : (nameEl?.value.trim() || '익명');
   showLoading();
   try {
     await addDoc(collection(db, 'boards', curBoard, 'posts', curPost, 'comments'), {
-      author, text, secret: isSec, uid: me?me.uid:null, createdAt: serverTimestamp()
+      author, text, secret: isSec, uid: me?me.uid:null,
+      parentId: parentId || null,
+      createdAt: serverTimestamp()
     });
     toast('등록되었습니다.'); await renderCmts(curPost);
   } finally { hideLoading(); }
@@ -1619,7 +1665,7 @@ function bindEvents() {
 Object.assign(window, {
   goHome, goBoard, goList, goWrite, goEdit, goAdmin, goSingle, pushHash,
   goGuest, openPost, doUnlock, submitWF, delPost,
-  submitCmt, delCmt, submitGuest, deleteGuest, unlockGuest, toggleGbPw,
+  submitCmt, delCmt, toggleReplyForm, submitGuest, deleteGuest, unlockGuest, toggleGbPw,
   startSingleEdit, saveSingleEdit, cancelSingleEdit,
   edCmdSingle, insertSingleImage, insertSingleVideo, handleSingleImgUpload,
   openModal, closeModal, toReg, toLi, doLogin, doReg, doLogout,
