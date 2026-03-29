@@ -152,16 +152,9 @@ nav { display: flex; align-items: center; }
   pointer-events: all;
 }
 .chat-msg { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
-.chat-msg.is-mine { align-items: flex-start; }
 .chat-author { font-size: 10px; color: #bbb; }
-.chat-text {
-  font-size: 12px;
-  color: #3a3a3a;
-  line-height: 1.5;
-  word-break: break-all;
-}
-.chat-msg.is-mine .chat-text { color: #3a3a3a; }
-.chat-time { font-size: 10px; color: #ccc; }
+.chat-text { font-size: 12px; color: #3a3a3a; line-height: 1.5; word-break: break-all; }
+.chat-time { font-size: 10px; color: #ccc; display: flex; align-items: center; gap: 2px; }
 .chat-input-wrap {
   display: flex;
   align-items: center;
@@ -645,7 +638,7 @@ nav { display: flex; align-items: center; }
 
   /* 게시판 영역 */
   .board-area { margin-top: 60px; min-height: auto; }
-  .home-area  { height: 60vw; min-height: 260px; }
+  .home-area  { height: 80vw; min-height: 360px; }
 
   /* 목록 */
   .board-inner { padding: 20px 0 32px; }
@@ -706,5 +699,5 @@ nav { display: flex; align-items: center; }
   .nav-right a, .nav-right span { font-size: 11px; }
   .logo { font-size: 12px; }
   .template-grid { grid-template-columns: repeat(2, 1fr); }
-  .home-area { height: 70vw; }
+  .home-area { height: 90vw; min-height: 400px; }
 }
