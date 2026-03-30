@@ -561,6 +561,7 @@ async function loadHomeEditor() {
   renderHomeTemplateGrid();
   selectHomeLayout(curHomeLayout);
   await loadPopupEditor();
+  await loadThemeList();
 
   try {
     const bioSnap = await getDoc(doc(db, 'config', 'logoBio'));
@@ -617,6 +618,81 @@ async function saveHomeContent() {
     await setDoc(doc(db,'config','home'), { content, lineHeight, layout: curHomeLayout, imgUrl });
     toast('홈 화면이 저장되었습니다.');
     await loadHome();
+  } finally { hideLoading(); }
+}
+
+// ── 홈 테마 시스템 ───────────────────────────────────────
+async function loadThemeList() {
+  const el = document.getElementById('themeList');
+  if (!el) return;
+  try {
+    const snap = await getDoc(doc(db, 'config', 'themes'));
+    const themes = snap.exists() ? (snap.data().list || []) : [];
+    if (!themes.length) {
+      el.innerHTML = `<div style="font-size:12px;color:#ccc;padding:8px 0">저장된 테마가 없습니다.</div>`;
+      return;
+    }
+    el.innerHTML = themes.map((t, i) => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0">
+        <span style="font-size:12px;color:#3a3a3a;flex:1">${esc(t.name)}</span>
+        <span style="font-size:10px;color:#ccc">${t.savedAt||''}</span>
+        <button onclick="applyTheme(${i})" style="font-size:11px;color:#3a3a3a;background:none;border:none;cursor:pointer;font-family:inherit">적용</button>
+        <button onclick="deleteTheme(${i})" style="font-size:11px;color:#bbb;background:none;border:none;cursor:pointer;font-family:inherit">삭제</button>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+async function saveAsTheme() {
+  const name = document.getElementById('themeNameInput')?.value.trim();
+  if (!name) { toast('테마 이름을 입력해주세요.'); return; }
+  const area       = document.getElementById('homeEditorArea');
+  const content    = area?.innerHTML.trim() || '';
+  const lineHeight = area?.dataset.lineHeight || '1.6';
+  const imgUrl     = curHomeLayout === 'split'  ? document.getElementById('homeSplitImg')?.value
+                   : curHomeLayout === 'topimg' ? document.getElementById('homeTopImg')?.value : '';
+  const theme = {
+    name, content, lineHeight, layout: curHomeLayout, imgUrl: imgUrl||'',
+    savedAt: new Date().toLocaleDateString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+  };
+  showLoading();
+  try {
+    const snap = await getDoc(doc(db, 'config', 'themes'));
+    const list = snap.exists() ? (snap.data().list || []) : [];
+    list.push(theme);
+    await setDoc(doc(db, 'config', 'themes'), { list });
+    document.getElementById('themeNameInput').value = '';
+    toast(`"${name}" 테마로 저장됐어요!`);
+    await loadThemeList();
+  } finally { hideLoading(); }
+}
+
+async function applyTheme(i) {
+  if (!confirm('이 테마로 홈을 바꿀까요?')) return;
+  showLoading();
+  try {
+    const snap = await getDoc(doc(db, 'config', 'themes'));
+    const themes = snap.data().list || [];
+    const t = themes[i];
+    await setDoc(doc(db, 'config', 'home'), {
+      content: t.content, lineHeight: t.lineHeight,
+      layout: t.layout, imgUrl: t.imgUrl||''
+    });
+    toast(`"${t.name}" 테마가 적용됐어요!`);
+    await loadHome();
+    await loadHomeEditor();
+  } finally { hideLoading(); }
+}
+
+async function deleteTheme(i) {
+  if (!confirm('테마를 삭제할까요?')) return;
+  showLoading();
+  try {
+    const snap = await getDoc(doc(db, 'config', 'themes'));
+    const list = snap.data().list || [];
+    list.splice(i, 1);
+    await setDoc(doc(db, 'config', 'themes'), { list });
+    toast('삭제됐어요.');
+    await loadThemeList();
   } finally { hideLoading(); }
 }
 
@@ -1808,6 +1884,7 @@ Object.assign(window, {
   openModal, closeModal, toReg, toLi, doLogin, doReg, doLogout,
   openMyInfo, saveMyInfo, openUserDetail, saveUserDetail, toggleAdminFromDetail, toggleAdmin, deleteUser,
   showAdminTab, renderBoardManage, moveBoardUp, moveBoardDown, deleteBoard, openAddBoard, submitAddBoard, saveHomeContent, saveBio, previewBioImg, uploadBioImg,
+  saveAsTheme, applyTheme, deleteTheme,
   savePopup, closePopup, popupEdCmd, insertPopupImage, insertPopupLink,
   openAddPopup, editPopup, deletePopup, toggleChatMemo, submitChatMsg, deleteChatMsg,
   setHomeLineHeight, homeEdCmd, insertHomeImage, insertHomeVideo, handleHomeImgUpload,
